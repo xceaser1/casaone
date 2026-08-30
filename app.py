@@ -107,8 +107,16 @@ def migrer_schema_projets():
     - ouvriers / parametres : changement structurel (contrainte/PK) -> table
       renommee, recreee au nouveau schema, puis donnees recopiees.
     - Codes niveaux/blocs/zones : unicite desormais par projet.
+
+    Cette migration ne concerne QUE les anciennes bases SQLite locales : elle
+    utilise du SQL specifique (sqlite_master, PRAGMA). Sur PostgreSQL (heberge),
+    les tables sont creees directement au bon schema par db.create_all() :
+    on sort immediatement.
     """
     from sqlalchemy import text
+
+    if db.engine.dialect.name != "sqlite":
+        return
 
     def existe(conn, table):
         r = conn.execute(
