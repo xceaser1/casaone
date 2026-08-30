@@ -1,0 +1,26 @@
+# Deploiement Render (Infrastructure as Code).
+# Render lit ce fichier et cree le service web + la base PostgreSQL.
+services:
+  - type: web
+    name: casaone
+    runtime: python
+    plan: starter                  # "free" possible pour tester (s'endort apres inactivite)
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
+    healthCheckPath: /login
+    envVars:
+      - key: PRODUCTION
+        value: "1"
+      - key: SECRET_KEY
+        generateValue: true        # cle forte generee et conservee par Render
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: casaone-db
+          property: connectionString
+
+databases:
+  - name: casaone-db
+    plan: basic-256mb              # "free" possible pour tester
+    databaseName: casaone

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block titre %}Matériel & engins{% endblock %}
+{% block sous_entete %}État du parc matériel du chantier{% endblock %}
+
+{% block contenu %}
+<div class="carte" style="margin-bottom:16px">
+  <div class="barre-outils">
+    <span style="color:var(--doux);font-size:.85rem">Parc matériel : engins, état et affectation</span>
+    {% if peut('engins', 'create') %}
+    <a class="btn btn-fonce" style="margin-left:auto" href="{{ url_for('pages.engins_registre') }}">Saisir / voir le parc</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grille-kpi" id="kpis"><div class="chargement">Chargement…</div></div>
+
+<div class="grille-2">
+  <div class="carte">
+    <div class="carte-tete"><h2>Répartition par type</h2></div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-type"></canvas></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete"><h2>État du parc</h2></div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-etat"></canvas></div></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function carteKpi({ lib, val, note, accent }) {
+  return `<div class="kpi ${accent ? 'accent' : ''}">
+    <span class="lib">${lib}</span><div class="val">${val}</div>
+    ${note ? `<div class="note">${note}</div>` : ''}</div>`;
+}
+(async function () {
+  const d = await api('/api/engins');
+  const k = d.kpis;
+  if (!k.total) {
+    document.getElementById('kpis').innerHTML =
+      `<div class="alerte info">Aucun engin saisi. Cliquez sur « Saisir / voir le parc » pour ajouter le premier engin.</div>`;
+    return;
+  }
+  document.getElementById('kpis').innerHTML = [
+    carteKpi({ lib: 'Engins au total', val: nombre(k.total, 0), accent: true, note: `${k.nb_types} types différents` }),
+    carteKpi({ lib: 'En service', val: nombre(k.en_service, 0), note: `${pourcent(k.taux_dispo)} de disponibilité` }),
+    carteKpi({ lib: 'En panne', val: nombre(k.en_panne, 0), note: 'À surveiller' }),
+    carteKpi({ lib: "Types d'engins", val: nombre(k.nb_types, 0), note: 'Catégories' })
+  ].join('');
+  new Chart(document.getElementById('g-type'), {
+    type: 'bar',
+    data: { labels: d.par_type.map(t => t.type), datasets: [{ data: d.par_type.map(t => t.nombre), backgroundColor: T.vert, borderRadius: 4 }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } },
+      scales: { x: { ...AXE_SOBRE, beginAtZero: true, ticks: { precision: 0 } }, y: AXE_NU } }
+  });
+  const couleurs = { 'En service': T.vertFonce, 'En panne': T.rouge, "A l'arret": T.ambre, 'En maintenance': T.bleu };
+  new Chart(document.getElementById('g-etat'), {
+    type: 'doughnut',
+    data: { labels: d.par_etat.map(e => e.etat), datasets: [{ data: d.par_etat.map(e => e.nombre),
+      backgroundColor: d.par_etat.map(e => couleurs[e.etat] || T.vert20), borderWidth: 0 }] },
+    options: { cutout: '58%', plugins: { legend: { position: 'bottom' } } }
+  });
+})();
+</script>
+{% endblock %}

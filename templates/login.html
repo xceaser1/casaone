@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connexion — {{ societe }} {{ projet_nom }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% include "_pwa.html" %}
+  <style>
+    /* ===================================================================
+       Connexion — interface élégante & dynamique (scopée : préfixe .auth)
+       =================================================================== */
+    .auth {
+      --auth-vert-fonce: #1e3a8a;
+      --auth-vert: #3b82f6;
+      --auth-vert-clair: #60a5fa;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1.08fr .92fr;
+      background: var(--blanc);
+      overflow: hidden;
+    }
+
+    /* ---------------------------------------------------- Panneau visuel */
+    .auth-visuel {
+      position: relative;
+      padding: 56px 60px;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      /* Repli si la photo est absente : dégradé bleu */
+      background: linear-gradient(158deg, #14225e 0%, #1e40af 55%, #2563eb 100%);
+    }
+    /* Photo d'architecture en fond, avec léger zoom continu */
+    .auth-photo {
+      position: absolute; inset: 0;
+      background: url("{{ url_for('static', filename='images/fond/tour.jpg') }}") center/cover no-repeat;
+      animation: zoom-lent 26s ease-in-out infinite alternate;
+    }
+    @keyframes zoom-lent { from { transform: scale(1); } to { transform: scale(1.09); } }
+    /* Voile bleu : garantit la lisibilité du texte blanc par-dessus la photo */
+    .auth-voile {
+      position: absolute; inset: 0;
+      background:
+        linear-gradient(158deg, rgba(20,34,94,.92) 0%, rgba(30,64,175,.82) 55%, rgba(37,99,235,.72) 100%);
+    }
+
+    /* Orbes flottantes floutées */
+    .auth-orbe {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(46px);
+      opacity: .28;              /* discret : la photo reste lisible */
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+    .auth-orbe.o1 { width: 320px; height: 320px; top: -90px; right: -70px;
+      background: radial-gradient(circle, #60a5fa 0%, transparent 70%); animation: flotte1 15s ease-in-out infinite; }
+    .auth-orbe.o2 { width: 260px; height: 260px; bottom: -60px; left: -50px;
+      background: radial-gradient(circle, #38bdf8 0%, transparent 70%); animation: flotte2 19s ease-in-out infinite; }
+    .auth-orbe.o3 { width: 180px; height: 180px; top: 42%; left: 55%;
+      background: radial-gradient(circle, #bfdbfe 0%, transparent 70%); animation: flotte1 22s ease-in-out infinite reverse; }
+    @keyframes flotte1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-26px,34px) scale(1.12); } }
+    @keyframes flotte2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-28px) scale(.9); } }
+
+    /* Grille discrète en surimpression */
+    .auth-visuel::after {
+      content: "";
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+      background-size: 46px 46px;
+      -webkit-mask-image: radial-gradient(120% 80% at 30% 40%, #000 0%, transparent 75%);
+              mask-image: radial-gradient(120% 80% at 30% 40%, #000 0%, transparent 75%);
+      pointer-events: none;
+    }
+
+    .auth-marque, .auth-titre, .auth-stats { position: relative; z-index: 1; }
+
+    .auth-marque {
+      display: flex; align-items: center; gap: 11px;
+      font-weight: 700; letter-spacing: .2em; font-size: .78rem; text-transform: uppercase;
+      animation: apparait .7s .05s both;
+    }
+    .auth-marque .pastille {
+      width: 30px; height: 30px; border-radius: 9px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.28);
+      display: grid; place-items: center; letter-spacing: 0;
+      font-size: .9rem; backdrop-filter: blur(4px);
+    }
+
+    .auth-titre { animation: apparait .7s .12s both; }
+    .auth-titre h1 {
+      color: #fff; font-size: 2.35rem; line-height: 1.12; max-width: 13ch; letter-spacing: -.02em;
+    }
+    .auth-titre h1 .accent {
+      background: linear-gradient(90deg, #bfdbfe, #eff6ff);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .auth-titre p { color: rgba(255,255,255,.82); max-width: 40ch; margin-top: 14px; line-height: 1.5; }
+
+    /* Coupe schématique : barres qui poussent au chargement */
+    .auth-coupe { display: flex; flex-direction: column-reverse; gap: 6px; margin: 30px 0; max-width: 460px; }
+    .auth-coupe span {
+      height: 12px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; display: block;
+    }
+    .auth-coupe span i {
+      display: block; height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, rgba(255,255,255,.9), rgba(255,255,255,.55));
+      width: 0; animation: pousse 1.1s cubic-bezier(.22,1,.36,1) both;
+    }
+    @keyframes pousse { from { width: 0; } to { width: var(--w); } }
+
+    .auth-stats {
+      display: flex; gap: 26px; animation: apparait .7s .3s both;
+    }
+    .auth-stats .stat b { display: block; font-size: 1.5rem; font-weight: 700; letter-spacing: -.01em; }
+    .auth-stats .stat span { font-size: .74rem; text-transform: uppercase; letter-spacing: .1em; color: rgba(255,255,255,.7); }
+
+    /* ------------------------------------------------------ Panneau form */
+    .auth-form {
+      display: flex; align-items: center; justify-content: center; padding: 40px;
+      background:
+        radial-gradient(80% 60% at 100% 0%, var(--vert-05) 0%, transparent 60%),
+        var(--blanc);
+    }
+    .auth-carte {
+      width: 100%; max-width: 360px;
+      animation: montee .8s cubic-bezier(.22,1,.36,1) both;
+    }
+    .auth-carte h2 { font-size: 1.55rem; margin-bottom: 6px; letter-spacing: -.02em; }
+    .auth-carte .sous { color: var(--doux); margin: 0 0 28px; }
+
+    .auth-champ { position: relative; margin-bottom: 15px; }
+    .auth-champ > label {
+      display: block; font-size: .76rem; font-weight: 600; color: var(--doux); margin-bottom: 6px;
+    }
+    .auth-input {
+      position: relative; display: flex; align-items: center;
+    }
+    .auth-input svg.ic {
+      position: absolute; left: 13px; width: 17px; height: 17px; color: var(--doux);
+      pointer-events: none; transition: color .18s;
+    }
+    .auth-input input {
+      width: 100%; padding: 12px 14px 12px 40px;
+      border: 1.5px solid var(--bord-fort); border-radius: var(--r-m);
+      font-size: .95rem; background: var(--blanc); transition: border-color .18s, box-shadow .18s;
+    }
+    .auth-input input:focus {
+      border-color: var(--vert); outline: none; box-shadow: 0 0 0 4px var(--vert-10);
+    }
+    .auth-input:focus-within svg.ic { color: var(--vert); }
+    .auth-oeil {
+      position: absolute; right: 8px; border: 0; background: transparent; cursor: pointer;
+      width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--doux);
+    }
+    .auth-oeil:hover { background: var(--vert-05); color: var(--vert-fonce); }
+    .auth-oeil svg { width: 18px; height: 18px; }
+
+    .auth-ligne {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 4px 0 22px; font-size: .84rem;
+    }
+    .auth-ligne label { display: flex; align-items: center; gap: 8px; color: var(--texte); cursor: pointer; user-select: none; }
+    .auth-ligne input[type=checkbox] { width: auto; accent-color: var(--vert); }
+
+    .auth-btn {
+      width: 100%; padding: 13px; border: 0; border-radius: var(--r-m); cursor: pointer;
+      color: #fff; font-size: .95rem; font-weight: 650; letter-spacing: .01em;
+      background: linear-gradient(135deg, var(--vert-fonce) 0%, var(--vert) 100%);
+      box-shadow: 0 8px 20px rgba(20,104,63,.28);
+      position: relative; overflow: hidden;
+      transition: transform .18s cubic-bezier(.22,1,.36,1), box-shadow .18s;
+    }
+    .auth-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(20,104,63,.34); }
+    .auth-btn:active { transform: translateY(0); }
+    .auth-btn::after {
+      content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+      transform: skewX(-20deg);
+    }
+    .auth-btn:hover::after { animation: brille .8s ease; }
+    @keyframes brille { to { left: 130%; } }
+
+    .auth-carte .alerte { animation: apparait .4s both; margin-bottom: 16px; }
+
+    .auth-pied { margin-top: 26px; text-align: center; font-size: .78rem; color: var(--doux); }
+
+    /* ------------------------------------------------------ Animations */
+    @keyframes apparait { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes montee   { from { opacity: 0; transform: translateY(22px) scale(.985); } to { opacity: 1; transform: none; } }
+
+    /* ------------------------------------------------------ Responsive */
+    @media (max-width: 860px) {
+      .auth { grid-template-columns: 1fr; }
+      .auth-visuel { padding: 40px 34px; min-height: 300px; }
+      .auth-titre h1 { font-size: 1.9rem; }
+      .auth-coupe { display: none; }
+      .auth-form { padding: 34px 26px 48px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .auth-visuel, .auth-orbe, .auth-photo, .auth-coupe span i,
+      .auth-marque, .auth-titre, .auth-stats, .auth-carte, .auth-btn::after { animation: none !important; }
+      .auth-coupe span i { width: var(--w); }
+    }
+  </style>
+</head>
+<body>
+<div class="auth">
+  <section class="auth-visuel">
+    <span class="auth-photo" aria-hidden="true"></span>
+    <span class="auth-voile" aria-hidden="true"></span>
+    <span class="auth-orbe o1"></span>
+    <span class="auth-orbe o2"></span>
+    <span class="auth-orbe o3"></span>
+
+    <div class="auth-marque">
+      <span class="pastille">◆</span>
+      <span>{{ societe }}</span>
+    </div>
+
+    <div class="auth-titre">
+      <h1>Tableau de bord <span class="accent">{{ projet_nom }}</span></h1>
+      <p>Surfaces, bétonnage, validation des plans et situation budgétaire — une seule source, mise à jour par l'équipe.</p>
+      <!-- Coupe schematique du projet : un trait par niveau, du dallage au 8e etage -->
+      <div class="auth-coupe" aria-hidden="true">
+        {% for largeur in [96, 92, 88, 34, 76, 46, 30, 28, 26, 24, 22, 18, 12, 9] %}
+        <span><i style="--w: {{ largeur }}%; animation-delay: {{ loop.index0 * 60 }}ms"></i></span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="auth-stats">
+      <div class="stat"><b>14</b><span>Niveaux</span></div>
+      <div class="stat"><b>30</b><span>Zones</span></div>
+      <div class="stat"><b>4</b><span>Types de dalles</span></div>
+    </div>
+  </section>
+
+  <section class="auth-form">
+    <form class="auth-carte" method="post" autocomplete="on">
+      <h2>Connexion</h2>
+      <p class="sous">Accès réservé aux collaborateurs {{ societe }}.</p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for categorie, message in messages %}
+          <div class="alerte {{ categorie }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <div class="auth-champ">
+        <label for="username">Identifiant</label>
+        <div class="auth-input">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <input id="username" type="text" name="username" required autofocus autocomplete="username" placeholder="prenom.nom">
+        </div>
+      </div>
+
+      <div class="auth-champ">
+        <label for="password">Mot de passe</label>
+        <div class="auth-input">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input id="password" type="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+          <button type="button" class="auth-oeil" id="bascule-mdp" aria-label="Afficher le mot de passe">
+            <svg id="oeil-ouvert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg id="oeil-ferme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3.5 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="auth-ligne">
+        <label><input type="checkbox" name="remember"> Rester connecté</label>
+      </div>
+
+      <button class="auth-btn" type="submit">Se connecter</button>
+
+      <p class="auth-pied">© {{ societe }} · {{ projet_nom }}</p>
+    </form>
+  </section>
+</div>
+
+<script>
+  (function () {
+    var champ = document.getElementById('password');
+    var bouton = document.getElementById('bascule-mdp');
+    var ouvert = document.getElementById('oeil-ouvert');
+    var ferme = document.getElementById('oeil-ferme');
+    if (!champ || !bouton) return;
+    bouton.addEventListener('click', function () {
+      var visible = champ.type === 'text';
+      champ.type = visible ? 'password' : 'text';
+      ouvert.style.display = visible ? '' : 'none';
+      ferme.style.display = visible ? 'none' : '';
+      bouton.setAttribute('aria-label', visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block titre %}Suivi des coûts{% endblock %}
+{% block sous_entete %}Situation budgétaire du marché{% endblock %}
+
+{% block contenu %}
+<div class="grille-kpi" id="kpis"><div class="chargement">Chargement…</div></div>
+
+<div class="grille-2">
+  <div class="carte">
+    <div class="carte-tete"><h2>Décomptes et cumul payé</h2></div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-couts"></canvas></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete">
+      <h2>Détail des décomptes</h2>
+      {% if peut('couts', 'export') %}
+      <a class="btn mini" href="{{ url_for('api.exporter', cle='couts', format_='xlsx') }}">Excel</a>
+      {% endif %}
+    </div>
+    <div class="carte-corps" style="padding:0">
+      <table class="tableau-simple" id="tbl-couts">
+        <thead><tr><th>Décompte</th><th class="num">Montant (MAD)</th><th class="num">Cumul (MAD)</th><th class="num">% marché</th></tr></thead>
+        <tbody><tr><td colspan="4" class="chargement">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(async function () {
+  const d = await api('/api/couts');
+  const k = d.kpis;
+
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi accent"><span class="lib">Montant global du marché</span>
+      <div class="val">${nombre(k.montant_marche, 0)}<small>MAD</small></div></div>
+    <div class="kpi"><span class="lib">Montant payé</span>
+      <div class="val">${nombre(k.montant_paye, 0)}<small>MAD</small></div>
+      <div class="jauge important"><i style="width:${Math.min(k.consommation_pct, 100)}%"></i></div>
+      <div class="note">${pourcent(k.consommation_pct)} du marché</div></div>
+    <div class="kpi"><span class="lib">Reste à payer</span>
+      <div class="val">${nombre(k.reste_a_payer, 0)}<small>MAD</small></div></div>
+    <div class="kpi"><span class="lib">Décomptes émis</span>
+      <div class="val">${d.decomptes.length}</div>
+      <div class="note">Avance incluse</div></div>
+    <div class="kpi"><span class="lib">Avancement physique</span>
+      <div class="val">${pourcent(k.avancement)}</div>
+      <div class="jauge"><i style="width:${Math.min(k.avancement, 100)}%"></i></div>
+      <div class="note">à comparer aux ${pourcent(k.consommation_pct)} facturés</div></div>`;
+
+  document.querySelector('#tbl-couts tbody').innerHTML = d.decomptes.map(c => `
+    <tr><td>${echapper(c.libelle)}</td>
+      <td class="num">${nombre(c.montant, 0)}</td>
+      <td class="num">${nombre(c.cumul, 0)}</td>
+      <td class="num">${pourcent(k.montant_marche ? 100 * c.cumul / k.montant_marche : 0)}</td></tr>`).join('');
+
+  new Chart(document.getElementById('g-couts'), {
+    data: {
+      labels: d.decomptes.map(c => c.libelle),
+      datasets: [
+        { type: 'bar', label: 'Décompte', data: d.decomptes.map(c => c.montant),
+          backgroundColor: T.vert40, borderRadius: 4 },
+        { type: 'line', label: 'Cumul payé', data: d.decomptes.map(c => c.cumul),
+          borderColor: T.vertFonce, borderWidth: 2, pointRadius: 2, tension: .25 }
+      ]
+    },
+    options: {
+      plugins: { legend: { position: 'bottom' },
+                 tooltip: { callbacks: { label: c => `${c.dataset.label} : ${monnaie(c.raw)}` } } },
+      scales: { x: AXE_NU, y: { ...AXE_SOBRE, beginAtZero: true, ticks: { callback: v => nombre(v / 1e6, 0) + ' M' } } }
+    }
+  });
+})();
+</script>
+{% endblock %}

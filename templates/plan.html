@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block titre %}Plan du projet{% endblock %}
+{% block sous_entete %}Avancement des zones — état actuel et progression{% endblock %}
+
+{% block contenu %}
+<style>
+.rendus-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.rendu { position: relative; display: block; border-radius: 12px; overflow: hidden; box-shadow: var(--ombre); transition: transform .2s ease, box-shadow .2s ease; }
+.rendu:hover { transform: translateY(-3px); box-shadow: var(--ombre-forte); }
+.rendu img { width: 100%; height: 240px; object-fit: cover; display: block; }
+.rendu span { position: absolute; left: 0; right: 0; bottom: 0; padding: 20px 14px 10px; color: #fff; font-size: .85rem; font-weight: 600; background: linear-gradient(180deg, transparent, rgba(15,36,25,.8)); }
+</style>
+<div class="carte" style="margin-bottom:16px">
+  <div class="barre-outils" style="gap:16px">
+    <button class="btn btn-fonce" id="btn-play">▶ Rejouer la progression</button>
+    <div style="flex:1;display:flex;align-items:center;gap:12px;min-width:260px">
+      <input type="range" id="curseur" min="0" value="0" step="1" style="flex:1">
+      <b id="lib-mois" style="min-width:90px;font-variant-numeric:tabular-nums">Actuel</b>
+    </div>
+    <div class="legende" style="margin-left:auto">
+      <span><i style="background:var(--vert-10)"></i>0–33 %</span>
+      <span><i style="background:var(--vert-40)"></i>34–66 %</span>
+      <span><i style="background:var(--vert)"></i>67–89 %</span>
+      <span><i style="background:var(--vert-fonce)"></i>90–100 %</span>
+    </div>
+  </div>
+</div>
+
+<div class="grille-2" style="grid-template-columns:1.6fr 1fr">
+  <div class="carte">
+    <div class="carte-tete"><h2>Plan de zonage</h2>
+      <a class="btn mini" href="{{ url_for('static', filename='plans/CFAO_Plan_Zonning.pdf') }}" target="_blank">Voir le plan PDF</a>
+    </div>
+    <div class="carte-corps">
+      <div id="plan-svg" style="width:100%"></div>
+    </div>
+  </div>
+
+  <div class="carte">
+    <div class="carte-tete"><h2>Détail des zones</h2></div>
+    <div class="carte-corps" style="padding:0">
+      <table class="tableau-simple" id="tbl-zones">
+        <thead><tr><th>Zone</th><th class="num">Avancement</th></tr></thead>
+        <tbody><tr><td colspan="2" class="chargement">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="carte" style="margin-top:16px">
+  <div class="carte-tete">
+    <h2>Maquette 3D — vue d'ensemble</h2>
+    <small style="color:var(--doux)">Faites glisser pour pivoter · molette pour zoomer</small>
+  </div>
+  <div class="carte-corps">
+    <div id="maquette3d" style="width:100%;height:440px;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#eaf5ef,#f4f8f6);position:relative">
+      <div id="m3d-info" style="position:absolute;left:14px;bottom:12px;background:rgba(15,36,25,.82);color:#fff;padding:8px 12px;border-radius:8px;font-size:.82rem;display:none"></div>
+    </div>
+  </div>
+</div>
+
+<div class="carte" style="margin-top:16px">
+  <div class="carte-tete">
+    <h2>Rendus du projet</h2>
+    <small style="color:var(--doux)">Perspectives d'architecte — CASA ONE</small>
+  </div>
+  <div class="carte-corps">
+    <div class="rendus-grille">
+      <a class="rendu" href="{{ url_for('static', filename='images/rendus/rendu1.jpg') }}" target="_blank">
+        <img src="{{ url_for('static', filename='images/rendus/rendu1.jpg') }}" alt="Plaza Hotel" loading="lazy">
+        <span>Plaza Hotel — entrée</span>
+      </a>
+      <a class="rendu" href="{{ url_for('static', filename='images/rendus/rendu2.jpg') }}" target="_blank">
+        <img src="{{ url_for('static', filename='images/rendus/rendu2.jpg') }}" alt="Vue d'ensemble" loading="lazy">
+        <span>Vue d'ensemble — esplanade</span>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/vendor/three.min.js') }}"></script>
+<script>
+/* Disposition fidèle au plan de zonage CFAO (viewBox 1000 x 600) :
+   - Malls empilés en bandes à gauche : Ouest (rangée A), Central (B), Est (C).
+   - Global Media au centre-bas ; bureaux + immeuble en tours à droite ;
+   - Esplanade basse au sud-est ; Hôtel = tour la plus haute à l'extrême droite. */
+const ZONES = [
+  { code: 'MAO',   nom: 'Mall Ouest',    x: 40,  y: 95,  w: 500, h: 122 },
+  { code: 'MAC',   nom: 'Mall Central',  x: 40,  y: 219, w: 500, h: 122 },
+  { code: 'MAE',   nom: 'Mall Est',      x: 40,  y: 343, w: 320, h: 118 },
+  { code: 'GBM',   nom: 'Global Media',  x: 362, y: 343, w: 178, h: 118 },
+  { code: 'IMMA',  nom: 'Bureau A',      x: 560, y: 95,  w: 122, h: 122 },
+  { code: 'IMMB',  nom: 'Bureau B',      x: 684, y: 95,  w: 122, h: 122 },
+  { code: 'IMM',   nom: 'Immeuble',      x: 560, y: 219, w: 122, h: 122 },
+  { code: 'ESP',   nom: 'Esplanade',     x: 684, y: 219, w: 274, h: 242 },
+  { code: 'HOTEL', nom: 'Hôtel',         x: 808, y: 95,  w: 150, h: 122 },
+];
+
+function couleur(pct) {
+  if (pct >= 90) return T.vertFonce;
+  if (pct >= 67) return T.vert;
+  if (pct >= 34) return T.vert40;
+  if (pct > 0)   return T.vert10;
+  return '#eef3f0';
+}
+function texteSur(pct) { return pct >= 67 ? '#fff' : 'var(--encre)'; }
+
+let DATA = null;
+let lecture = null;
+
+function dessiner(avancements, libelleMois) {
+  const svg = ZONES.map(z => {
+    const pct = avancements[z.code] ?? 0;
+    const remplissage = couleur(pct);
+    const col = texteSur(pct);
+    return `
+      <g class="zone-plan" data-code="${z.code}" style="cursor:pointer">
+        <rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="6"
+              fill="${remplissage}" stroke="#fff" stroke-width="3"
+              style="transition:fill .5s ease"/>
+        <text x="${z.x + z.w/2}" y="${z.y + z.h/2 - 8}" text-anchor="middle"
+              font-size="15" font-weight="600" fill="${col}">${z.nom}</text>
+        <text x="${z.x + z.w/2}" y="${z.y + z.h/2 + 14}" text-anchor="middle"
+              font-size="18" font-weight="700" fill="${col}"
+              style="font-variant-numeric:tabular-nums">${pourcent(pct)}</text>
+      </g>`;
+  }).join('');
+
+  document.getElementById('plan-svg').innerHTML = `
+    <svg viewBox="0 0 1000 600" style="width:100%;height:auto" role="img"
+         aria-label="Plan de zonage du projet, avancement par zone">
+      <text x="500" y="40" text-anchor="middle" font-size="13" fill="var(--doux)"
+            letter-spacing="2" font-weight="600">PROJET CASA ONE — ${echapper(libelleMois)}</text>
+      <text x="360" y="230" text-anchor="middle" font-size="12" fill="var(--doux)"
+            letter-spacing="3">— MALLS —</text>
+      <text x="760" y="230" text-anchor="middle" font-size="12" fill="var(--doux)"
+            letter-spacing="3">— IMMEUBLES —</text>
+      ${svg}
+    </svg>`;
+
+  document.getElementById('lib-mois').textContent = libelleMois;
+
+  // survol → surbrillance de la ligne du tableau
+  document.querySelectorAll('.zone-plan').forEach(g => {
+    g.addEventListener('mouseenter', () => surligner(g.dataset.code, true));
+    g.addEventListener('mouseleave', () => surligner(g.dataset.code, false));
+  });
+}
+
+function surligner(code, on) {
+  const tr = document.querySelector(`#tbl-zones tr[data-code="${code}"]`);
+  if (tr) tr.style.background = on ? 'var(--vert-05)' : '';
+}
+
+function majTableau(avancements) {
+  const lignes = ZONES.map(z => ({ ...z, pct: avancements[z.code] ?? 0 }))
+                      .sort((a, b) => b.pct - a.pct);
+  document.querySelector('#tbl-zones tbody').innerHTML = lignes.map(z => `
+    <tr data-code="${z.code}">
+      <td><b>${echapper(z.nom)}</b> <span style="color:var(--doux)">${z.code}</span></td>
+      <td class="num"><div class="mini-jauge">
+        <span class="piste"><i style="width:${Math.min(z.pct,100)}%;background:${couleur(z.pct)}"></i></span>
+        <b>${pourcent(z.pct)}</b></div></td>
+    </tr>`).join('');
+}
+
+/* avancements à un index de mois donné (ou état actuel si index = null) */
+function avancementsAuMois(idx) {
+  const a = {};
+  if (idx === null) {
+    for (const code in DATA.etat) a[code] = DATA.etat[code].avancement;
+  } else {
+    for (const code in DATA.timeline.cumul) a[code] = DATA.timeline.cumul[code][idx] ?? 0;
+  }
+  return a;
+}
+
+function afficher(idx) {
+  const libelle = idx === null ? 'État actuel' : moisLisible(DATA.timeline.mois[idx]);
+  const av = avancementsAuMois(idx);
+  dessiner(av, libelle);
+  majTableau(av);
+  document.getElementById('lib-mois').textContent = libelle;
+}
+
+(async function () {
+  DATA = await api('/api/plan');
+  const mois = DATA.timeline.mois;
+  const curseur = document.getElementById('curseur');
+  curseur.max = mois.length;            // dernier cran = état actuel
+  curseur.value = mois.length;
+
+  afficher(null);  // on démarre sur l'état actuel
+
+  curseur.addEventListener('input', () => {
+    const v = parseInt(curseur.value, 10);
+    afficher(v >= mois.length ? null : v);
+  });
+
+  /* Animation : on parcourt les mois puis on finit sur l'état actuel */
+  document.getElementById('btn-play').addEventListener('click', e => {
+    if (lecture) { clearInterval(lecture); lecture = null; e.target.textContent = '▶ Rejouer la progression'; return; }
+    e.target.textContent = '⏸ Pause';
+    let i = 0;
+    curseur.value = 0; afficher(0);
+    lecture = setInterval(() => {
+      i++;
+      if (i > mois.length) {
+        clearInterval(lecture); lecture = null;
+        e.target.textContent = '▶ Rejouer la progression';
+        curseur.value = mois.length; afficher(null);
+        return;
+      }
+      curseur.value = i;
+      afficher(i >= mois.length ? null : i);
+    }, 650);
+  });
+
+  // Une fois les données chargées, on construit la maquette 3D
+  construireMaquette3D();
+})();
+
+/* ============================ Maquette 3D ============================ */
+function construireMaquette3D() {
+  if (typeof THREE === 'undefined') return;
+  const hote = document.getElementById('maquette3d');
+  const info = document.getElementById('m3d-info');
+  const L = hote.clientWidth, H = hote.clientHeight;
+
+  // Hauteurs d'apres les plans d'architecte (nombre de niveaux R+n).
+  // Hotel R+8 (le plus haut), bureaux R+6/7, IMM R+5, malls R+3, esplanade basse.
+  const HAUTEURS = {
+    MAO: 3, MAC: 3, MAE: 3, GBM: 2, ESP: 1,
+    IMMA: 7, IMMB: 7, IMM: 6, HOTEL: 9,
+  };
+
+  function couleur3D(pct) {
+    if (pct >= 90) return 0x1d4ed8;
+    if (pct >= 67) return 0x3b82f6;
+    if (pct >= 34) return 0x6ea0f8;
+    if (pct > 0)   return 0xbfd4fd;
+    return 0xdfe4ee;
+  }
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, L / H, 0.1, 5000);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(L, H);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  hote.appendChild(renderer.domElement);
+
+  // Lumières
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+  dir.position.set(300, 500, 200);
+  scene.add(dir);
+
+  // Sol
+  const sol = new THREE.Mesh(
+    new THREE.PlaneGeometry(1400, 1000),
+    new THREE.MeshLambertMaterial({ color: 0xe8f2ec })
+  );
+  sol.rotation.x = -Math.PI / 2;
+  sol.position.set(500, 0, 320);
+  scene.add(sol);
+
+  // Blocs : on réutilise les coordonnées ZONES du plan 2D
+  const blocs = [];
+  const echelleH = 26; // hauteur d'un "étage" en unités 3D
+  ZONES.forEach(z => {
+    const pct = (DATA.etat[z.code] || {}).avancement || 0;
+    const etages = HAUTEURS[z.code] || 3;
+    const haut = etages * echelleH;
+    const coul = couleur3D(pct);
+
+    // Corps du bâtiment : coque translucide (vide à l'intérieur, on voit au travers)
+    const geo = new THREE.BoxGeometry(z.w, haut, z.h);
+    const mat = new THREE.MeshLambertMaterial({
+      color: coul, transparent: true, opacity: 0.28,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const cube = new THREE.Mesh(geo, mat);
+    cube.position.set(z.x + z.w / 2, haut / 2, z.y + z.h / 2);
+    cube.userData = { nom: z.nom, code: z.code, pct: pct, etages: etages };
+    scene.add(cube);
+
+    // Toit légèrement plus foncé (débord)
+    const toit = new THREE.Mesh(
+      new THREE.BoxGeometry(z.w + 6, 4, z.h + 6),
+      new THREE.MeshLambertMaterial({ color: 0x0f2419 })
+    );
+    toit.position.set(z.x + z.w / 2, haut + 2, z.y + z.h / 2);
+    scene.add(toit);
+
+    // Lignes d'étages (arêtes horizontales) pour donner l'échelle
+    for (let e = 1; e < etages; e++) {
+      const y = e * echelleH;
+      const ligne = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(z.w, 0.5, z.h)),
+        new THREE.LineBasicMaterial({ color: 0x3b82f6, opacity: 0.35, transparent: true })
+      );
+      ligne.position.set(z.x + z.w / 2, y, z.y + z.h / 2);
+      scene.add(ligne);
+    }
+
+    // Arêtes du volume : dessinent la coque vide du bâtiment
+    const aretes = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: 0x1d4ed8, opacity: 0.65, transparent: true })
+    );
+    aretes.position.copy(cube.position);
+    scene.add(aretes);
+    blocs.push(cube);
+  });
+
+  // Caméra orbitale (rotation manuelle, sans OrbitControls)
+  let angle = -0.6, elevation = 0.9, distance = 900;
+  const cible = new THREE.Vector3(500, 40, 320);
+  function placerCamera() {
+    camera.position.set(
+      cible.x + distance * Math.cos(elevation) * Math.cos(angle),
+      cible.y + distance * Math.sin(elevation),
+      cible.z + distance * Math.cos(elevation) * Math.sin(angle)
+    );
+    camera.lookAt(cible);
+  }
+  placerCamera();
+
+  // Interaction souris : rotation
+  let glisse = false, xPrec = 0, yPrec = 0;
+  renderer.domElement.addEventListener('mousedown', e => { glisse = true; xPrec = e.clientX; yPrec = e.clientY; });
+  window.addEventListener('mouseup', () => glisse = false);
+  window.addEventListener('mousemove', e => {
+    if (!glisse) return;
+    angle += (e.clientX - xPrec) * 0.008;
+    elevation = Math.max(0.2, Math.min(1.4, elevation + (e.clientY - yPrec) * 0.006));
+    xPrec = e.clientX; yPrec = e.clientY;
+    placerCamera();
+  });
+  // Zoom molette
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    distance = Math.max(400, Math.min(1800, distance + e.deltaY * 0.6));
+    placerCamera();
+  }, { passive: false });
+
+  // Clic sur un bloc → info
+  const ray = new THREE.Raycaster(), souris = new THREE.Vector2();
+  renderer.domElement.addEventListener('click', e => {
+    const r = renderer.domElement.getBoundingClientRect();
+    souris.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+    souris.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(souris, camera);
+    const hits = ray.intersectObjects(blocs);
+    if (hits.length) {
+      const d = hits[0].object.userData;
+      info.style.display = 'block';
+      info.innerHTML = `<b>${d.nom}</b> — ${pourcent(d.pct)} · ~${d.etages} niveaux`;
+    } else {
+      info.style.display = 'none';
+    }
+  });
+
+  // Boucle de rendu
+  let dernierMouv = Date.now();
+  renderer.domElement.addEventListener('mousedown', () => dernierMouv = Date.now());
+  renderer.domElement.addEventListener('wheel', () => dernierMouv = Date.now());
+  (function animer() {
+    requestAnimationFrame(animer);
+    // Rotation douce automatique apres 3s d'inactivite
+    if (!glisse && Date.now() - dernierMouv > 3000) {
+      angle += 0.0015;
+      placerCamera();
+    }
+    renderer.render(scene, camera);
+  })();
+
+  // Redimensionnement
+  window.addEventListener('resize', () => {
+    const l = hote.clientWidth, h = hote.clientHeight;
+    camera.aspect = l / h; camera.updateProjectionMatrix();
+    renderer.setSize(l, h);
+  });
+}
+</script>
+{% endblock %}

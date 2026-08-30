@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titre %}Accueil{% endblock %}
+{% block sous_entete %}Accès rapide à toutes les fonctions{% endblock %}
+
+{% block contenu %}
+<div class="accueil-grille">
+  {% set cartes = [
+    ('dashboard', 'dashboard', 'Dashboard', "Vue d'ensemble du chantier", 'pages.dashboard', 'vert'),
+    ('surfaces', 'plan', 'Plan du projet', 'Avancement des zones', 'pages.plan_interactif', 'vert'),
+    ('surfaces', 'surfaces', 'Surfaces', 'Tableau des surfaces', 'pages.surfaces', 'vert'),
+    ('betonnage', 'betonnage', 'Bétonnage', 'Suivi mensuel des coulages', 'pages.betonnage', 'vert'),
+    ('livraisons', 'livraisons', 'Livraisons béton', 'Volumes livrés par les centrales', 'pages.livraisons', 'cyan'),
+    ('engins', 'engins', 'Matériel & engins', 'Parc matériel du chantier', 'pages.engins', 'cyan'),
+    ('validation', 'validation', 'Validation des plans', 'Statut des plans', 'pages.validation', 'bleu'),
+    ('couts', 'couts', 'Suivi des coûts', 'Décomptes et paiements', 'pages.couts', 'ambre'),
+    ('mainoeuvre', 'mainoeuvre', "Main-d'œuvre", 'Effectif et pointage', 'pages.mainoeuvre', 'violet'),
+  ] %}
+
+  {% for perm, icone, titre, desc, route, couleur in cartes %}
+    {% if peut(perm) %}
+    <a class="tuile tuile-{{ couleur }}" href="{{ url_for(route) }}">
+      <span class="tuile-ico">{{ ico(icone) }}</span>
+      <span class="tuile-txt">
+        <b>{{ titre }}</b>
+        <small>{{ desc }}</small>
+      </span>
+    </a>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

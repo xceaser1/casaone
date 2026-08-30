@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block titre %}Zone {{ zone.code }}{% endblock %}
+{% block sous_entete %}Bloc {{ zone.bloc.code }} — {{ zone.bloc.libelle }}{% endblock %}
+
+{% block contenu %}
+<div style="margin-bottom:14px">
+  <a class="btn mini" href="{{ url_for('pages.surfaces') }}">← Retour au tableau de surfaces</a>
+</div>
+
+<div class="grille-kpi" id="kpis"><div class="chargement">Chargement…</div></div>
+
+<div class="grille-2">
+  <div class="carte">
+    <div class="carte-tete"><h2>Coupe de la zone</h2><small style="color:var(--doux)">Du dallage au dernier niveau</small></div>
+    <div class="carte-corps"><div class="coupe-projet" id="coupe"></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete"><h2>Derniers coulages</h2></div>
+    <div class="carte-corps" style="padding:0">
+      <table class="tableau-simple" id="tbl-coulages">
+        <thead><tr><th>Date</th><th>Niveau</th><th class="num">Surface (m²)</th></tr></thead>
+        <tbody><tr><td colspan="3" class="chargement">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="carte-tete"><h2>Surfaces par niveau</h2></div>
+  <div class="carte-corps" style="padding:0">
+    <table class="tableau-simple" id="tbl-niveaux">
+      <thead><tr><th>Niveau</th><th class="num">Prévu (m²)</th><th class="num">Coulé (m²)</th><th class="num">Reste (m²)</th><th class="num">Avancement</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(async function () {
+  const d = await api('/api/zone/{{ zone.id }}');
+  const r = d.resume;
+
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi accent"><span class="lib">Avancement de la zone</span>
+      <div class="val">${pourcent(r.avancement)}</div>
+      <div class="jauge important"><i style="width:${Math.min(r.avancement, 100)}%"></i></div></div>
+    <div class="kpi"><span class="lib">Surface prévue</span><div class="val">${nombre(r.total, 0)}<small>m²</small></div></div>
+    <div class="kpi"><span class="lib">Surface coulée</span><div class="val">${nombre(r.coule, 0)}<small>m²</small></div></div>
+    <div class="kpi"><span class="lib">Reste à couler</span><div class="val">${nombre(r.reste, 0)}<small>m²</small></div>
+      <div class="note">${r.nb_niveaux} niveaux renseignés</div></div>`;
+
+  document.getElementById('coupe').innerHTML = d.niveaux.map(n => `
+    <div class="coupe-ligne ${n.avancement >= 90 ? 'forte' : ''}">
+      <span class="niv">${echapper(n.niveau)}</span>
+      <span class="barre"><i style="width:${Math.min(n.avancement, 100)}%"></i></span>
+      <span class="pc">${pourcent(n.avancement)}</span></div>`).join('');
+
+  document.querySelector('#tbl-niveaux tbody').innerHTML = d.niveaux.map(n => `
+    <tr><td>${echapper(n.niveau)}</td>
+      <td class="num">${nombre(n.surface_totale)}</td>
+      <td class="num">${nombre(n.surface_coulee)}</td>
+      <td class="num">${nombre(n.surface_totale - n.surface_coulee)}</td>
+      <td class="num">${pourcent(n.avancement)}</td></tr>`).join('');
+
+  const coulages = document.querySelector('#tbl-coulages tbody');
+  coulages.innerHTML = d.coulages.length
+    ? d.coulages.map(c => `<tr><td>${echapper(c.date)}</td><td>${echapper(c.niveau || '—')}</td>
+        <td class="num">${nombre(c.surface)}</td></tr>`).join('')
+    : '<tr><td colspan="3"><div class="vide"><b>Aucun coulage enregistré</b>Cette zone n\'apparaît pas encore dans le journal de bétonnage.</div></td></tr>';
+})();
+</script>
+{% endblock %}

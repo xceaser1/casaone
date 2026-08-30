@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block titre %}Présences{% endblock %}
+{% block sous_entete %}Pointage par badge QR — {{ projet_actif.nom if projet_actif else projet_nom }}{% endblock %}
+
+{% block contenu %}
+<div class="presences-barre">
+  <form method="get" class="presences-date">
+    <label>Jour
+      <input type="date" name="jour" value="{{ jour.isoformat() }}" max="{{ aujourdhui.isoformat() }}" onchange="this.form.submit()">
+    </label>
+    {% if jour != aujourdhui %}<a class="btn mini" href="{{ url_for('pointage.presences') }}">Aujourd'hui</a>{% endif %}
+  </form>
+  <div class="presences-actions">
+    <a class="btn" href="{{ url_for('pointage.export_presences', fmt='xlsx', jour=jour.isoformat()) }}">{{ ico('export') }} Excel</a>
+    <a class="btn" href="{{ url_for('pointage.export_presences', fmt='csv', jour=jour.isoformat()) }}">CSV</a>
+    <a class="btn btn-vert" href="{{ url_for('pointage.scan') }}">{{ ico('scan') }} Scanner</a>
+  </div>
+</div>
+
+<div class="grille-kpi">
+  <div class="kpi accent">
+    <span class="lib">Présents</span>
+    <div class="val">{{ stats.presents }}<small>/ {{ stats.effectif }}</small></div>
+    <div class="jauge"><i style="width:{{ stats.taux }}%"></i></div>
+    <div class="note">{{ stats.taux }} % de l'effectif</div>
+  </div>
+  <div class="kpi">
+    <span class="lib">Effectif</span>
+    <div class="val">{{ stats.effectif }}</div>
+    <div class="note">roster du dernier mois</div>
+  </div>
+  <div class="kpi">
+    <span class="lib">Sur site</span>
+    <div class="val">{{ stats.sur_site }}</div>
+    <div class="note">entrés, pas encore sortis</div>
+  </div>
+  <div class="kpi">
+    <span class="lib">Partis</span>
+    <div class="val">{{ stats.partis }}</div>
+    <div class="note">sortie enregistrée</div>
+  </div>
+  <div class="kpi">
+    <span class="lib">Absents</span>
+    <div class="val">{{ stats.absents }}</div>
+    <div class="note">aucun pointage ce jour</div>
+  </div>
+</div>
+
+<div class="presences-diagrammes">
+  <div class="carte">
+    <div class="carte-tete"><h3>Répartition du jour</h3></div>
+    <div class="carte-corps"><div class="graph"><canvas id="g-repartition"></canvas></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete"><h3>Présents par fonction</h3></div>
+    <div class="carte-corps"><div class="graph"><canvas id="g-fonction"></canvas></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete"><h3>Entrées par heure</h3></div>
+    <div class="carte-corps"><div class="graph"><canvas id="g-heure"></canvas></div></div>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="carte-tete">
+    <h3>Pointage du {{ jour.strftime('%d/%m/%Y') }}</h3>
+    <span style="color:var(--doux);font-size:.82rem">{{ lignes|length }} pointé{{ 's' if lignes|length > 1 }}</span>
+  </div>
+
+  <div class="pres-onglets" id="pres-onglets">
+    <button class="on" data-f="tous">Tous</button>
+    <button data-f="site">Sur site</button>
+    <button data-f="partis">Partis</button>
+  </div>
+
+  <div class="pres-liste">
+    {% for l in lignes %}
+      {% set parts = (l.nom or '?').split() %}
+      {% set ini = ((parts[0][0] if parts else '?') ~ (parts[1][0] if parts|length > 1 else '')) | upper %}
+      {% set etat = 'site' if (l.entree and not l.sortie) else ('partis' if l.sortie else 'absent') %}
+    <div class="pres-c" data-etat="{{ etat }}">
+      <span class="pres-av {{ 'sortie' if etat == 'partis' }}">{{ ini }}</span>
+      <div class="pres-info">
+        <b>{{ l.nom or '—' }}</b>
+        <small>{{ ('Mat. ' ~ l.matricule) if l.matricule else 'Sans matricule' }}</small>
+      </div>
+      <div class="pres-tps">
+        {% if etat == 'site' %}<span class="badge-statut b-vert">Sur site</span>
+        {% elif etat == 'partis' %}<span class="badge-statut b-gris">Parti</span>
+        {% else %}<span class="badge-statut b-ambre">—</span>{% endif %}
+        <span class="pres-h">
+          <b>↓ {{ l.entree.strftime('%H:%M') if l.entree else '—' }}</b>
+          {% if l.sortie %}<b>↑ {{ l.sortie.strftime('%H:%M') }}</b>{% endif %}
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+    {% if not lignes %}
+    <div class="pres-vide">Aucun pointage pour ce jour.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STATS = {{ stats|tojson }};
+const VERT = '#3b82f6', FONCE = '#1d4ed8', GRIS = '#9aa5b8', CLAIR = '#dbe7fe', AMBRE = '#e08a1e';
+
+if (window.Chart) {
+  new Chart(document.getElementById('g-repartition'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Sur site', 'Partis', 'Absents'],
+      datasets: [{ data: [STATS.sur_site, STATS.partis, STATS.absents],
+        backgroundColor: [VERT, GRIS, CLAIR], borderWidth: 0 }]
+    },
+    options: { cutout: '62%', plugins: { legend: { position: 'bottom' } } }
+  });
+
+  new Chart(document.getElementById('g-fonction'), {
+    type: 'bar',
+    data: {
+      labels: STATS.par_fonction.map(f => f[0]),
+      datasets: [{ data: STATS.par_fonction.map(f => f[1]), backgroundColor: VERT, borderRadius: 6, maxBarThickness: 26 }]
+    },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  new Chart(document.getElementById('g-heure'), {
+    type: 'bar',
+    data: {
+      labels: STATS.par_heure.map(h => h[0]),
+      datasets: [{ data: STATS.par_heure.map(h => h[1]), backgroundColor: FONCE, borderRadius: 5, maxBarThickness: 20 }]
+    },
+    options: { plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+/* Onglets de filtre de la liste de pointage */
+document.querySelectorAll('#pres-onglets button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#pres-onglets button').forEach(x => x.classList.toggle('on', x === b));
+  const f = b.dataset.f;
+  document.querySelectorAll('.pres-c').forEach(c => {
+    c.style.display = (f === 'tous' || c.dataset.etat === f) ? '' : 'none';
+  });
+}));
+</script>
+{% endblock %}

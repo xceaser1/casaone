@@ -1,0 +1,181 @@
+{% macro ico(nom) %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  {% if nom == 'projets' %}<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M2 13h20"/>
+  {% elif nom == 'dashboard' %}<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>
+  {% elif nom == 'surfaces' %}<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/>
+  {% elif nom == 'betonnage' %}<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>
+  {% elif nom == 'validation' %}<path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8.5 13.5l2.5 2.5 4.5-5"/>
+  {% elif nom == 'dalles' %}<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5M3 17l9 5 9-5"/>
+  {% elif nom == 'diagrammes' %}<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>
+  {% elif nom == 'couts' %}<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+  {% elif nom == 'mainoeuvre' %}<circle cx="9" cy="7" r="3"/><path d="M2 20a7 7 0 0 1 14 0"/><path d="M16 3.5a3 3 0 0 1 0 7M22 20a7 7 0 0 0-5-6.7"/>
+  {% elif nom == 'plan' %}<path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2z"/><path d="M9 3v16M15 5v16"/>
+  {% elif nom == 'livraisons' %}<path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2"/><circle cx="18.5" cy="18.5" r="2"/>
+  {% elif nom == 'engins' %}<rect x="3" y="11" width="13" height="7" rx="1"/><path d="M16 13h3l2 3v2h-5z"/><circle cx="7" cy="18.5" r="1.8"/><circle cx="17.5" cy="18.5" r="1.8"/><path d="M6 11V7h5l2 4"/>
+  {% elif nom == 'qr' %}<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M14 21v.01M17.5 17.5v.01M21 17.5v.01M17.5 21v.01M21 21v.01"/>
+  {% elif nom == 'scan' %}<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/>
+  {% elif nom == 'presence' %}<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m15.5 11 2 2 4-4"/>
+  {% elif nom == 'admin' %}<circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>
+  {% elif nom == 'sortie' %}<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>
+  {% elif nom == 'recherche' %}<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>
+  {% elif nom == 'export' %}<path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v3h16v-3"/>
+  {% elif nom == 'plus' %}<path d="M12 5v14M5 12h14"/>
+  {% elif nom == 'reset' %}<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
+  {% endif %}
+</svg>
+{% endmacro %}
+
+{% macro lien(cible, page_id, courant, libelle, icone=None, sous=False) %}
+<a href="{{ cible }}" class="{{ 'actif' if courant == page_id }}">
+  {% if icone %}{{ ico(icone) }}{% endif %}<span>{{ libelle }}</span>
+</a>
+{% endmacro %}
+
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titre %}{{ projet_nom }}{% endblock %} — {{ societe }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2314603c'/><text x='16' y='22' font-size='15' font-family='sans-serif' fill='white' text-anchor='middle'>U</text></svg>">
+  {% include "_pwa.html" %}
+</head>
+<body>
+<div class="appli">
+  <aside class="sidebar">
+    <div class="sidebar-tete">
+      <details class="projet-switch" id="projet-switch">
+        <summary title="Changer de projet">
+          <span class="marque-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 21h18"/><path d="M6 21V7l6-4 6 4v14"/><path d="M10 21v-4h4v4"/><path d="M9 10h.01M15 10h.01M9 13.5h.01M15 13.5h.01"/>
+            </svg>
+          </span>
+          <span class="marque">
+            <b>{{ projet_actif.nom if projet_actif else projet_nom }}</b>
+            <small>{{ societe }}{% if projet_actif and projet_actif.client %} · {{ projet_actif.client }}{% endif %}</small>
+          </span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="projet-menu">
+          <div class="projet-menu-titre">Projets</div>
+          {% for p in projets %}
+          <form method="post" action="{{ url_for('projets.activer', projet_id=p.id) }}">
+            <input type="hidden" name="suivant" value="{{ request.path }}">
+            <button type="submit" class="projet-item {{ 'actif' if projet_actif and p.id == projet_actif.id }}">
+              <span class="projet-pastille s-{{ p.statut_classe }}">{{ p.initiales }}</span>
+              <span class="projet-item-txt">
+                <b>{{ p.nom }}</b>
+                <small>{{ p.client or p.code }}</small>
+              </span>
+              {% if projet_actif and p.id == projet_actif.id %}
+              <svg class="coche" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+              {% endif %}
+            </button>
+          </form>
+          {% endfor %}
+          <a class="projet-menu-lien" href="{{ url_for('projets.index') }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Gérer les projets
+          </a>
+        </div>
+      </details>
+    </div>
+    <nav class="nav">
+      {% if peut('projets') %}{{ lien(url_for('projets.index'), 'projets', page, 'Projets', 'projets') }}{% endif %}
+      {% if peut('dashboard') %}{{ lien(url_for('pages.dashboard'), 'dashboard', page, 'Dashboard', 'dashboard') }}{% endif %}
+
+      <div class="nav-titre">Suivi de production</div>
+      {% if peut('surfaces') %}{{ lien(url_for('pages.plan_interactif'), 'plan', page, 'Plan du projet', 'plan') }}{% endif %}
+      {% if peut('surfaces') %}{{ lien(url_for('pages.surfaces'), 'surfaces', page, 'Tableau de surfaces', 'surfaces') }}{% endif %}
+      {% if peut('betonnage') %}{{ lien(url_for('pages.betonnage'), 'betonnage', page, 'Betonnage mensuelle', 'betonnage') }}{% endif %}
+      {% if peut('livraisons') %}
+      {{ lien(url_for('pages.livraisons'), 'livraisons', page, 'Livraisons béton', 'livraisons') }}
+      <div class="sous-nav">
+        {{ lien(url_for('pages.livraisons_registre'), 'livraisons-registre', page, 'Journal des livraisons') }}
+      </div>
+      {% endif %}
+      {% if peut('engins') %}
+      {{ lien(url_for('pages.engins'), 'engins', page, 'Matériel & engins', 'engins') }}
+      <div class="sous-nav">
+        {{ lien(url_for('pages.engins_registre'), 'engins-registre', page, 'Parc matériel') }}
+      </div>
+      {% endif %}
+      {% if peut('validation') %}{{ lien(url_for('pages.validation'), 'validation', page, 'Validation des plans', 'validation') }}{% endif %}
+
+      {% if peut('dalles') %}
+      <div class="nav-titre">Dalles</div>
+      {{ lien(url_for('pages.dalles'), 'dalles', page, 'Tous les types', 'dalles') }}
+      <div class="sous-nav">
+        {{ lien(url_for('pages.dalles', slug='reticulee'), 'dalles-reticulee', page, 'Dalle réticulée') }}
+        {{ lien(url_for('pages.dalles', slug='pleine'), 'dalles-pleine', page, 'Dalle pleine') }}
+        {{ lien(url_for('pages.dalles', slug='post-tension'), 'dalles-post-tension', page, 'Dalle post-tension') }}
+        {{ lien(url_for('pages.dalles', slug='hourdis'), 'dalles-hourdis', page, 'Dalle hourdis') }}
+      </div>
+      {% endif %}
+
+      {% if peut('diagrammes') %}
+      <div class="nav-titre">Diagrammes</div>
+      {{ lien(url_for('pages.diagrammes', axe='type'), 'diag-type', page, 'Par type', 'diagrammes') }}
+      {{ lien(url_for('pages.diagrammes', axe='niveau'), 'diag-niveau', page, 'Par niveau', 'diagrammes') }}
+      {% endif %}
+
+      <div class="nav-titre">Finances</div>
+      {% if peut('couts') %}{{ lien(url_for('pages.couts'), 'couts', page, 'Suivi des coûts', 'couts') }}{% endif %}
+
+      {% if peut('mainoeuvre') %}
+      <div class="nav-titre">Ressources</div>
+      {{ lien(url_for('pages.mainoeuvre'), 'mainoeuvre', page, "Main-d'œuvre", 'mainoeuvre') }}
+      <div class="sous-nav">
+        {{ lien(url_for('pages.mainoeuvre_registre'), 'mainoeuvre-registre', page, 'Registre des ouvriers') }}
+      </div>
+      {% endif %}
+
+      {% if peut('pointage') %}
+      <div class="nav-titre">Pointage</div>
+      {{ lien(url_for('pointage.presences'), 'presences', page, 'Présences du jour', 'presence') }}
+      {{ lien(url_for('pointage.scan'), 'scan', page, 'Scanner (mobile)', 'scan') }}
+      {{ lien(url_for('pointage.liste_badges'), 'badges', page, 'Badges QR', 'qr') }}
+      {% endif %}
+
+      {% if current_user.est_admin %}
+      <div class="nav-titre">Système</div>
+      {{ lien(url_for('admin.index'), 'admin', page, 'Administration', 'admin') }}
+      {% endif %}
+    </nav>
+  </aside>
+
+  <div class="zone">
+    <header class="topbar">
+      <div class="fil">
+        <h1>{% block entete %}{{ self.titre() }}{% endblock %}</h1>
+        <small>{% block sous_entete %}{% endblock %}</small>
+      </div>
+      <div class="compte">
+        <div class="compte-infos">
+          <b>{{ current_user.nom_complet or current_user.username }}</b>
+          <span>{{ current_user.role.nom if current_user.role }}</span>
+        </div>
+        <div class="avatar">{{ (current_user.nom_complet or current_user.username)[:2]|upper }}</div>
+        <a class="btn mini" href="{{ url_for('auth.logout') }}" title="Se déconnecter">{{ ico('sortie') }}</a>
+      </div>
+    </header>
+
+    <main class="contenu">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for categorie, message in messages %}
+          <div class="alerte {{ categorie }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+      {% block contenu %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<div class="notifs" id="notifs"></div>
+<script src="{{ url_for('static', filename='js/vendor/chart.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

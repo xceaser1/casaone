@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block titre %}Main-d'œuvre{% endblock %}
+{% block sous_entete %}Effectif, présence et productivité{% endblock %}
+
+{% block contenu %}
+<div class="carte" style="margin-bottom:16px">
+  <div class="barre-outils">
+    <label style="display:flex;align-items:center;gap:7px;font-size:.82rem;color:var(--doux);width:auto">
+      Mois du pointage
+      <select id="mois" style="width:auto"></select>
+    </label>
+    <a class="btn" style="margin-left:auto" href="{{ url_for('pages.mainoeuvre_registre') }}">Voir le registre nominatif</a>
+  </div>
+</div>
+
+<div class="grille-kpi" id="kpis"><div class="chargement">Chargement…</div></div>
+
+<div class="grille-2">
+  <div class="carte">
+    <div class="carte-tete"><h2>Effectif par fonction</h2><small style="color:var(--doux)" id="lib-mois"></small></div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-fonction"></canvas></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete"><h2>Évolution de l'effectif</h2></div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-effectif"></canvas></div></div>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="carte-tete">
+    <h2>Main-d'œuvre et production</h2>
+    <div class="legende">
+      <span><i style="background:var(--vert-40)"></i>Effectif</span>
+      <span><i style="background:var(--vert-fonce)"></i>m² coulés</span>
+    </div>
+  </div>
+  <div class="carte-corps"><div class="zone-graph"><canvas id="g-croisement"></canvas></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let gFonction, gEffectif, gCroisement;
+
+function carteKpi({ lib, val, unite, note, jauge, accent }) {
+  return `<div class="kpi ${accent ? 'accent' : ''}">
+    <span class="lib">${lib}</span>
+    <div class="val">${val}${unite ? `<small>${unite}</small>` : ''}</div>
+    ${jauge !== undefined ? `<div class="jauge"><i style="width:${Math.min(jauge, 100)}%"></i></div>` : ''}
+    ${note ? `<div class="note">${note}</div>` : ''}
+  </div>`;
+}
+
+function rendreKpis(k) {
+  document.getElementById('kpis').innerHTML = [
+    carteKpi({ lib: 'Effectif du mois', val: nombre(k.effectif, 0), accent: true,
+               note: `${k.fonctions} fonctions différentes` }),
+    carteKpi({ lib: 'Présence moyenne', val: pourcent(k.presence_moyenne), jauge: k.presence_moyenne,
+               note: 'Sur les jours pointés' }),
+    carteKpi({ lib: 'Présents (≥ 90 %)', val: nombre(k.presents_pleins, 0),
+               note: `sur ${nombre(k.effectif, 0)} ouvriers` }),
+    carteKpi({ lib: 'Heures supplémentaires', val: nombre(k.heures_supp, 0), unite: 'h',
+               note: `${nombre(k.heures_supp_moyenne, 0)} h/ouvrier en moyenne` })
+  ].join('');
+}
+
+function rendreFonction(donnees) {
+  const labels = donnees.map(d => d.fonction);
+  const data = donnees.map(d => d.effectif);
+  if (gFonction) gFonction.destroy();
+  gFonction = new Chart(document.getElementById('g-fonction'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: T.vert, borderRadius: 4 }] },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => `${nombre(c.raw, 0)} ouvrier(s)` } } },
+      scales: { x: { ...AXE_SOBRE, beginAtZero: true, ticks: { precision: 0 } }, y: AXE_NU }
+    }
+  });
+}
+
+(async function () {
+  const d = await api('/api/mainoeuvre');
+
+  if (!d.mois_disponibles.length) {
+    document.getElementById('kpis').innerHTML =
+      `<div class="alerte info">Aucun pointage importé pour l'instant. Un administrateur peut importer un canevas mensuel depuis la page Administration.</div>`;
+    return;
+  }
+
+  const selMois = document.getElementById('mois');
+  selMois.innerHTML = d.mois_disponibles.map(m => `<option value="${m}">${moisLisible(m)}</option>`).join('');
+  selMois.value = d.kpis.mois;
+  document.getElementById('lib-mois').textContent = moisLisible(d.kpis.mois);
+
+  rendreKpis(d.kpis);
+  rendreFonction(d.par_fonction);
+
+  /* Évolution de l'effectif */
+  gEffectif = new Chart(document.getElementById('g-effectif'), {
+    data: {
+      labels: d.effectif_mensuel.map(m => moisLisible(m.mois)),
+      datasets: [
+        { type: 'bar', label: 'Effectif', data: d.effectif_mensuel.map(m => m.effectif),
+          backgroundColor: T.vert40, borderRadius: 4, order: 2 },
+        { type: 'line', label: 'Présence moyenne (%)', data: d.effectif_mensuel.map(m => m.presence),
+          borderColor: T.vertFonce, borderWidth: 2, pointRadius: 2, tension: .3, yAxisID: 'y2', order: 1 }
+      ]
+    },
+    options: {
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        x: AXE_NU,
+        y: { ...AXE_SOBRE, beginAtZero: true, ticks: { precision: 0 } },
+        y2: { position: 'right', grid: { display: false }, border: { display: false },
+              beginAtZero: true, max: 100, ticks: { callback: v => v + ' %' } }
+      }
+    }
+  });
+
+  /* Croisement effectif / surface coulée */
+  gCroisement = new Chart(document.getElementById('g-croisement'), {
+    data: {
+      labels: d.croisement.map(m => moisLisible(m.mois)),
+      datasets: [
+        { type: 'bar', label: 'Effectif', data: d.croisement.map(m => m.effectif),
+          backgroundColor: T.vert40, borderRadius: 4, yAxisID: 'y' },
+        { type: 'line', label: 'm² coulés', data: d.croisement.map(m => m.surface_coulee),
+          borderColor: T.vertFonce, borderWidth: 2, pointRadius: 2, tension: .3, yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { afterBody: items => {
+          const i = items[0].dataIndex; const m = d.croisement[i];
+          return `Productivité : ${nombre(m.m2_par_ouvrier)} m²/ouvrier`;
+        } } }
+      },
+      scales: {
+        x: AXE_NU,
+        y: { ...AXE_SOBRE, beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Effectif' } },
+        y2: { position: 'right', grid: { display: false }, border: { display: false },
+              beginAtZero: true, ticks: { callback: v => nombre(v, 0) } }
+      }
+    }
+  });
+
+  /* Changement de mois : recharge KPI + graphe fonctions */
+  selMois.addEventListener('change', async () => {
+    const r = await api('/api/mainoeuvre?mois=' + encodeURIComponent(selMois.value));
+    document.getElementById('lib-mois').textContent = moisLisible(selMois.value);
+    rendreKpis(r.kpis);
+    rendreFonction(r.par_fonction);
+  });
+})();
+</script>
+{% endblock %}

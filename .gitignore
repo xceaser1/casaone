@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+database/*.db
+database/*.db.bak-*
+database/.secret_key
+uploads/*.xlsx
+uploads/*.xlsm
+
+# Fichiers d IDE
+.idea/
+.vscode/

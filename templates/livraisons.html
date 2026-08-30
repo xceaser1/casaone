@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block titre %}Livraisons de béton{% endblock %}
+{% block sous_entete %}Volumes livrés et rapprochement avec le bétonnage{% endblock %}
+
+{% block contenu %}
+<div class="carte" style="margin-bottom:16px">
+  <div class="barre-outils">
+    <span style="color:var(--doux);font-size:.85rem">Suivi des livraisons de béton par les centrales</span>
+    {% if peut('livraisons', 'create') %}
+    <a class="btn btn-fonce" style="margin-left:auto" href="{{ url_for('pages.livraisons_registre') }}">Saisir / voir le journal</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grille-kpi" id="kpis"><div class="chargement">Chargement…</div></div>
+
+<div class="grille-2">
+  <div class="carte">
+    <div class="carte-tete"><h2>Volume livré par mois</h2></div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-mensuel"></canvas></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete"><h2>Répartition par fournisseur</h2></div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-fournisseur"></canvas></div></div>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="carte-tete">
+    <h2>Béton livré et surface coulée</h2>
+    <div class="legende">
+      <span><i style="background:var(--vert-40)"></i>Volume livré (m³)</span>
+      <span><i style="background:var(--vert-fonce)"></i>Surface coulée (m²)</span>
+    </div>
+  </div>
+  <div class="carte-corps"><div class="zone-graph"><canvas id="g-croisement"></canvas></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function carteKpi({ lib, val, unite, note, accent }) {
+  return `<div class="kpi ${accent ? 'accent' : ''}">
+    <span class="lib">${lib}</span>
+    <div class="val">${val}${unite ? `<small>${unite}</small>` : ''}</div>
+    ${note ? `<div class="note">${note}</div>` : ''}
+  </div>`;
+}
+
+(async function () {
+  const d = await api('/api/livraisons');
+  const k = d.kpis;
+
+  if (!k.nb_livraisons) {
+    document.getElementById('kpis').innerHTML =
+      `<div class="alerte info">Aucune livraison saisie pour l'instant. Cliquez sur « Saisir / voir le journal » pour enregistrer la première livraison de béton.</div>`;
+    return;
+  }
+
+  document.getElementById('kpis').innerHTML = [
+    carteKpi({ lib: 'Volume total livré', val: nombre(k.volume_total, 0), unite: 'm³', accent: true,
+               note: `${k.nb_livraisons} livraisons enregistrées` }),
+    carteKpi({ lib: 'Volume du mois', val: nombre(k.volume_mois, 0), unite: 'm³',
+               note: moisLisible(k.mois) }),
+    carteKpi({ lib: 'Livraisons', val: nombre(k.nb_livraisons, 0),
+               note: 'Bons enregistrés' }),
+    carteKpi({ lib: 'Fournisseurs', val: nombre(k.nb_fournisseurs, 0),
+               note: 'Centrales à béton' })
+  ].join('');
+
+  /* Volume mensuel */
+  new Chart(document.getElementById('g-mensuel'), {
+    type: 'bar',
+    data: {
+      labels: d.volume_mensuel.map(m => moisLisible(m.mois)),
+      datasets: [{ data: d.volume_mensuel.map(m => m.volume),
+                   backgroundColor: T.vert40, borderRadius: 4 }]
+    },
+    options: {
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => `${nombre(c.raw)} m³` } } },
+      scales: { x: AXE_NU, y: { ...AXE_SOBRE, beginAtZero: true, ticks: { callback: v => nombre(v, 0) } } }
+    }
+  });
+
+  /* Répartition par fournisseur */
+  const palette = [T.vertFonce, T.vert, T.vert40, T.vert20, T.ambre, T.bleu];
+  new Chart(document.getElementById('g-fournisseur'), {
+    type: 'doughnut',
+    data: {
+      labels: d.par_fournisseur.map(f => f.fournisseur),
+      datasets: [{ data: d.par_fournisseur.map(f => f.volume),
+                   backgroundColor: d.par_fournisseur.map((_, i) => palette[i % palette.length]),
+                   borderWidth: 0 }]
+    },
+    options: { cutout: '58%', plugins: { legend: { position: 'bottom' },
+      tooltip: { callbacks: { label: c => `${c.label} : ${nombre(c.raw)} m³` } } } }
+  });
+
+  /* Croisement livré / coulé */
+  new Chart(document.getElementById('g-croisement'), {
+    data: {
+      labels: d.croisement.map(m => moisLisible(m.mois)),
+      datasets: [
+        { type: 'bar', label: 'Volume livré (m³)', data: d.croisement.map(m => m.volume_livre),
+          backgroundColor: T.vert40, borderRadius: 4, yAxisID: 'y' },
+        { type: 'line', label: 'Surface coulée (m²)', data: d.croisement.map(m => m.surface_coulee),
+          borderColor: T.vertFonce, borderWidth: 2, pointRadius: 2, tension: .3, yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { afterBody: items => {
+          const m = d.croisement[items[0].dataIndex];
+          return m.ratio ? `Ratio : ${nombre(m.ratio)} m³/m²` : '';
+        } } }
+      },
+      scales: {
+        x: AXE_NU,
+        y: { ...AXE_SOBRE, beginAtZero: true, ticks: { callback: v => nombre(v, 0) }, title: { display: true, text: 'm³ livrés' } },
+        y2: { position: 'right', grid: { display: false }, border: { display: false },
+              beginAtZero: true, ticks: { callback: v => nombre(v, 0) } }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

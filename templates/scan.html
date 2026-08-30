@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Scanner — {{ societe }} {{ projet_nom }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% include "_pwa.html" %}
+  <style>
+    :root { --scan-bg:#eef3f0; }
+    body { margin:0; background:var(--scan-bg); }
+    .sc { max-width:480px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; padding-bottom:104px; }
+
+    /* En-tete */
+    .sc-tete { display:flex; align-items:center; gap:8px; padding:16px 16px 8px; }
+    .sc-tete .ic-btn { width:40px; height:40px; border-radius:12px; background:#fff; border:1px solid var(--bord); display:grid; place-items:center; color:var(--encre); }
+    .sc-tete .ic-btn svg { width:20px; height:20px; }
+    .sc-tete h1 { flex:1; text-align:center; font-size:1.15rem; color:var(--encre); margin:0; }
+
+    /* Segment Entree / Sortie */
+    .sc-seg { display:flex; gap:6px; background:#fff; border:1px solid var(--bord); border-radius:14px; padding:5px; margin:6px 16px 14px; }
+    .sc-seg button { flex:1; border:0; background:transparent; color:var(--doux); font-weight:650; font-size:.92rem; padding:11px; border-radius:10px; cursor:pointer; transition:.15s; }
+    .sc-seg button.on { background:var(--vert-fonce); color:#fff; box-shadow:0 4px 12px rgba(20,104,63,.28); }
+    .sc-seg button.sortie.on { background:var(--ambre); box-shadow:0 4px 12px rgba(224,138,30,.3); }
+
+    /* Viseur camera */
+    .viseur { position:relative; margin:0 16px; border-radius:26px; overflow:hidden; background:#0b2318; aspect-ratio:1/1; box-shadow:0 16px 40px rgba(15,36,25,.18); }
+    .viseur video { width:100%; height:100%; object-fit:cover; display:block; }
+    .coin { position:absolute; width:38px; height:38px; border:4px solid #fff; }
+    .coin.tl { top:20px; left:20px; border-right:0; border-bottom:0; border-radius:14px 0 0 0; }
+    .coin.tr { top:20px; right:20px; border-left:0; border-bottom:0; border-radius:0 14px 0 0; }
+    .coin.bl { bottom:20px; left:20px; border-right:0; border-top:0; border-radius:0 0 0 14px; }
+    .coin.br { bottom:20px; right:20px; border-left:0; border-top:0; border-radius:0 0 14px 0; }
+    .rayon { position:absolute; left:22px; right:22px; height:0; box-shadow:0 0 14px 3px rgba(127,214,166,.9); border-top:3px solid #7ffcc0; border-radius:3px; top:22px; animation:balaye 2.4s ease-in-out infinite; }
+    @keyframes balaye { 0%,100%{ top:22px; } 50%{ top:calc(100% - 22px); } }
+
+    /* Carte resultat */
+    .carte-res { background:#fff; border:1px solid var(--bord); border-radius:20px; margin:16px; padding:18px; box-shadow:0 8px 24px rgba(15,36,25,.06); }
+    .carte-res.vide { text-align:center; color:var(--doux); font-size:.9rem; padding:26px 18px; }
+    .res-tete { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+    .res-av { width:46px; height:46px; border-radius:13px; background:var(--vert-10); color:var(--vert-fonce); display:grid; place-items:center; font-weight:700; font-size:1rem; flex:none; }
+    .res-tete .n { flex:1; min-width:0; }
+    .res-tete .n b { display:block; font-size:1.05rem; color:var(--encre); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .res-tete .n small { color:var(--doux); font-size:.8rem; }
+    .res-pill { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:6px 12px; border-radius:99px; flex:none; }
+    .res-pill.entree { background:var(--vert-10); color:var(--vert-fonce); }
+    .res-pill.sortie { background:var(--ambre-10); color:var(--ambre); }
+    .res-lignes { display:flex; flex-direction:column; }
+    .res-l { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid var(--bord); font-size:.9rem; }
+    .res-l span { color:var(--doux); }
+    .res-l b { color:var(--encre); font-variant-numeric:tabular-nums; }
+
+    /* Compteurs */
+    .compteurs { display:flex; gap:10px; margin:0 16px 4px; }
+    .compteurs .b { flex:1; background:#fff; border:1px solid var(--bord); border-radius:16px; padding:12px; text-align:center; }
+    .compteurs .b b { display:block; font-size:1.5rem; color:var(--encre); font-weight:750; }
+    .compteurs .b span { font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--doux); }
+    .etat { text-align:center; color:var(--doux); font-size:.82rem; margin:10px 16px 0; min-height:1em; }
+
+    /* Historique de session */
+    .hist { margin:16px; }
+    .hist-tete { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .hist-tete h2 { font-size:.95rem; color:var(--encre); margin:0; }
+    .hist-tete a { font-size:.82rem; color:var(--vert-fonce); font-weight:600; }
+    .hist-liste { display:flex; flex-direction:column; gap:10px; }
+    .h-carte { display:flex; align-items:center; gap:12px; background:#fff; border:1px solid var(--bord); border-radius:16px; padding:11px 13px; animation:pop .22s ease; }
+    @keyframes pop { from{ transform:translateY(-6px); opacity:0; } to{ transform:none; opacity:1; } }
+    .h-av { width:40px; height:40px; border-radius:11px; display:grid; place-items:center; font-weight:700; font-size:.8rem; flex:none; background:var(--vert-10); color:var(--vert-fonce); }
+    .h-av.sortie { background:var(--ambre-10); color:var(--ambre); }
+    .h-info { flex:1; min-width:0; }
+    .h-info b { display:block; font-size:.92rem; color:var(--encre); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .h-info small { font-size:.76rem; color:var(--doux); }
+    .h-tps { text-align:right; flex:none; }
+    .h-tps .p { font-size:.64rem; font-weight:700; text-transform:uppercase; padding:2px 8px; border-radius:99px; background:var(--vert-10); color:var(--vert-fonce); }
+    .h-tps .p.sortie { background:var(--ambre-10); color:var(--ambre); }
+    .h-tps .t { display:block; font-size:.82rem; color:var(--encre); font-weight:600; margin-top:3px; }
+    .hist-vide { text-align:center; color:var(--doux); font-size:.86rem; padding:20px; }
+
+    /* Saisie manuelle */
+    .manuel { margin:0 16px; display:none; }
+    .manuel.on { display:block; }
+    .manuel-in { display:flex; gap:8px; background:#fff; border:1px solid var(--bord); border-radius:14px; padding:8px; }
+    .manuel-in input { flex:1; border:0; padding:10px 12px; font-size:.95rem; background:transparent; }
+    .manuel-in button { border:0; border-radius:10px; padding:0 18px; font-weight:650; background:var(--vert-fonce); color:#fff; }
+
+    /* Barre inferieure (pill) */
+    .pill { position:fixed; left:50%; transform:translateX(-50%); bottom:16px; width:min(92%,440px);
+      display:flex; align-items:center; justify-content:space-around; gap:10px;
+      background:#10241a; border-radius:26px; padding:10px 22px; box-shadow:0 12px 34px rgba(15,36,25,.4); z-index:20; }
+    .pill button, .pill a { background:transparent; border:0; color:rgba(255,255,255,.7); display:grid; place-items:center; cursor:pointer; }
+    .pill svg { width:24px; height:24px; }
+    .pill .centre { width:58px; height:58px; border-radius:50%; background:var(--vert); color:#fff; box-shadow:0 6px 18px rgba(47,168,100,.5); margin-top:-22px; }
+    .pill .centre svg { width:28px; height:28px; }
+
+    /* Desktop : ouvrir sur telephone */
+    .desktop { display:none; margin:16px; text-align:center; }
+    .desktop .qr { background:#fff; border-radius:20px; padding:24px; display:inline-block; }
+    .desktop .qr svg { width:200px; height:200px; }
+    .desktop .u { margin-top:12px; font-size:.8rem; color:var(--doux); word-break:break-all; }
+    body.pas-mobile .viseur, body.pas-mobile .sc-seg, body.pas-mobile .compteurs,
+    body.pas-mobile .etat, body.pas-mobile .hist, body.pas-mobile .manuel, body.pas-mobile .pill, body.pas-mobile .carte-res { display:none; }
+    body.pas-mobile .desktop { display:block; }
+  </style>
+</head>
+<body>
+<div class="sc">
+  <div class="sc-tete">
+    <a class="ic-btn" href="{{ url_for('pointage.presences') }}" title="Retour">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <h1>Scanner</h1>
+    <span class="ic-btn" style="color:var(--doux)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+    </span>
+  </div>
+
+  <div class="sc-seg" id="seg">
+    <button data-type="entree" class="on">Entrée</button>
+    <button data-type="sortie" class="sortie">Sortie</button>
+  </div>
+
+  <div class="viseur">
+    <video id="video" playsinline muted></video>
+    <span class="coin tl"></span><span class="coin tr"></span>
+    <span class="coin bl"></span><span class="coin br"></span>
+    <div class="rayon"></div>
+  </div>
+
+  <div class="etat" id="etat">Initialisation de la caméra…</div>
+
+  <div class="carte-res vide" id="res-vide">Visez un badge — le résultat s'affiche ici.</div>
+  <div class="carte-res" id="res" style="display:none">
+    <div class="res-tete">
+      <span class="res-av" id="r-av">–</span>
+      <span class="n"><b id="r-nom">—</b><small id="r-fonction"></small></span>
+      <span class="res-pill entree" id="r-pill">Entrée</span>
+    </div>
+    <div class="res-lignes">
+      <div class="res-l"><span>Matricule</span><b id="r-mat">—</b></div>
+      <div class="res-l"><span>Projet</span><b>{{ projet_actif.code if projet_actif else 'CFAO' }}</b></div>
+      <div class="res-l"><span>Heure</span><b id="r-heure">—</b></div>
+    </div>
+  </div>
+
+  <div class="compteurs">
+    <div class="b"><b id="c-scan">0</b><span>Scannés</span></div>
+    <div class="b"><b id="c-pres">—</b><span>Présents</span></div>
+  </div>
+
+  <div class="manuel" id="manuel">
+    <div class="manuel-in">
+      <input id="matricule" inputmode="numeric" placeholder="Matricule chantier">
+      <button id="ok-manuel">OK</button>
+    </div>
+  </div>
+
+  <div class="hist">
+    <div class="hist-tete"><h2>Cette session</h2><a href="{{ url_for('pointage.presences') }}">Historique →</a></div>
+    <div class="hist-liste" id="liste">
+      <div class="hist-vide" id="vide">Aucun badge scanné pour l'instant.</div>
+    </div>
+  </div>
+
+  <div class="desktop">
+    <h2 style="color:var(--encre)">Scanner sur téléphone</h2>
+    <p style="color:var(--doux);font-size:.9rem">Scannez ce QR avec l'appareil photo de votre téléphone.</p>
+    <div class="qr">{{ qr_ouvrir | safe }}</div>
+    <div class="u">{{ url_mobile }}</div>
+  </div>
+</div>
+
+<div class="pill">
+  <a href="{{ url_for('pointage.presences') }}" title="Historique">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.7 9.7 0 0 0-6.7 2.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+  </a>
+  <button class="centre" title="Scanner">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/></svg>
+  </button>
+  <button id="btn-manuel" title="Saisie manuelle">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg>
+  </button>
+</div>
+
+<canvas id="canvas" hidden></canvas>
+<script src="{{ url_for('static', filename='js/vendor/jsQR.js') }}"></script>
+<script>
+(function () {
+  var estMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 1 && matchMedia('(pointer: coarse)').matches);
+  if (!estMobile) { document.body.classList.add('pas-mobile'); return; }
+
+  var video = document.getElementById('video'), canvas = document.getElementById('canvas');
+  var ctx = canvas.getContext('2d', { willReadFrequently: true });
+  var etat = document.getElementById('etat');
+  var type = 'entree', recents = {}, scannes = 0;
+
+  document.querySelectorAll('#seg button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#seg button').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on'); type = b.dataset.type;
+    });
+  });
+  document.getElementById('btn-manuel').addEventListener('click', function () {
+    var m = document.getElementById('manuel'); m.classList.toggle('on');
+    if (m.classList.contains('on')) document.getElementById('matricule').focus();
+  });
+  document.getElementById('ok-manuel').addEventListener('click', function () {
+    var v = document.getElementById('matricule').value.trim();
+    if (v) { envoyer({ matricule: v, type: type }); document.getElementById('matricule').value = ''; }
+  });
+
+  function vibrer(m) { if (navigator.vibrate) { try { navigator.vibrate(m); } catch (e) {} } }
+  function inits(n) { var p = (n || '?').trim().split(/\s+/); return (((p[0]||'')[0]||'') + ((p[1]||'')[0]||'')).toUpperCase(); }
+
+  function afficherResultat(d, sens) {
+    document.getElementById('res-vide').style.display = 'none';
+    var r = document.getElementById('res'); r.style.display = 'block';
+    document.getElementById('r-av').textContent = inits(d.nom);
+    document.getElementById('r-nom').textContent = d.nom;
+    document.getElementById('r-fonction').textContent = d.fonction || '';
+    document.getElementById('r-mat').textContent = d.matricule || '—';
+    document.getElementById('r-heure').textContent = d.heure;
+    var pill = document.getElementById('r-pill');
+    pill.className = 'res-pill ' + sens;
+    pill.textContent = (sens === 'sortie' ? 'Sortie' : 'Entrée') + (d.deja ? ' · MAJ' : '');
+  }
+
+  function ajouterHistorique(d, sens) {
+    var v = document.getElementById('vide'); if (v) v.remove();
+    var liste = document.getElementById('liste');
+    var id = 'h-' + (d.matricule || d.nom).replace(/\W+/g, '') + '-' + sens;
+    var old = document.getElementById(id); if (old) old.remove();
+    var el = document.createElement('div'); el.className = 'h-carte'; el.id = id;
+    el.innerHTML =
+      '<span class="h-av ' + sens + '"></span>' +
+      '<span class="h-info"><b></b><small></small></span>' +
+      '<span class="h-tps"><span class="p ' + sens + '">' + (sens === 'sortie' ? 'Sortie' : 'Entrée') + '</span><span class="t"></span></span>';
+    el.querySelector('.h-av').textContent = inits(d.nom);
+    el.querySelector('.h-info b').textContent = d.nom;
+    el.querySelector('.h-info small').textContent = [d.matricule, d.fonction].filter(Boolean).join(' · ');
+    el.querySelector('.h-tps .t').textContent = d.heure;
+    liste.insertBefore(el, liste.firstChild);
+  }
+
+  async function envoyer(payload) {
+    try {
+      var r = await fetch('{{ url_for('pointage.checkin') }}', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      var d = await r.json();
+      if (!r.ok || !d.ok) { etat.textContent = d.erreur || 'Badge refusé'; vibrer([40,60,40]); return; }
+      scannes++; document.getElementById('c-scan').textContent = scannes;
+      if (typeof d.presents === 'number') document.getElementById('c-pres').textContent = d.presents;
+      afficherResultat(d, payload.type);
+      ajouterHistorique(d, payload.type);
+      etat.textContent = 'Visez le badge suivant';
+      vibrer(55);
+    } catch (e) { etat.textContent = 'Hors ligne — réessayez'; }
+  }
+
+  function extraireToken(x) { var i = x.indexOf('/p/'); return i >= 0 ? x.slice(i + 3).split(/[?#]/)[0] : x; }
+  function traiter(x) {
+    var token = extraireToken(x), t = Date.now();
+    if (recents[token] && t - recents[token] < 3000) return;
+    recents[token] = t; envoyer({ token: token, type: type });
+  }
+  function boucle() {
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      var code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+      if (code && code.data) traiter(code.data.trim());
+    }
+    requestAnimationFrame(boucle);
+  }
+  async function demarrer() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      etat.innerHTML = 'Caméra indisponible — ouvrez en <b>HTTPS</b> ou utilisez la saisie manuelle.'; return;
+    }
+    try {
+      var s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      video.srcObject = s; await video.play();
+      etat.textContent = 'Visez un badge';
+      requestAnimationFrame(boucle);
+    } catch (e) {
+      etat.innerHTML = (e && e.name === 'NotAllowedError')
+        ? 'Accès caméra refusé. Autorisez la caméra.'
+        : 'Caméra inaccessible (HTTPS requis). Utilisez la saisie manuelle.';
+    }
+  }
+  demarrer();
+})();
+</script>
+</body>
+</html>

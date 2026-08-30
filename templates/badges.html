@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titre %}Badges QR{% endblock %}
+{% block sous_entete %}{{ badges|length }} badge{{ 's' if badges|length > 1 }} — {{ projet_actif.nom if projet_actif else projet_nom }}{% endblock %}
+
+{% block contenu %}
+<div class="badges-barre">
+  <p class="badges-info">Chaque ouvrier a un badge QR à imprimer et à scanner au pointage. Le QR encode un jeton signé propre à ce projet.</p>
+  <button class="btn btn-fonce" onclick="window.print()">{{ ico('export') }} Imprimer les badges</button>
+</div>
+
+{% if not badges %}
+<div class="carte" style="padding:40px;text-align:center;color:var(--doux)">
+  Aucun ouvrier dans ce projet. Importez un canevas de pointage pour générer les badges.
+</div>
+{% else %}
+<div class="badges-grille">
+  {% for b in badges %}
+  <div class="badge">
+    <div class="badge-tete">
+      <span class="badge-societe">{{ societe }}</span>
+      <span class="badge-projet">{{ projet_actif.code if projet_actif else 'CFAO' }}</span>
+    </div>
+    <div class="badge-qr">{{ b.svg | safe }}</div>
+    <div class="badge-nom">{{ b.nom or '—' }}</div>
+    <div class="badge-meta">
+      {% if b.matricule %}<span class="badge-mat">{{ b.matricule }}</span>{% endif %}
+      {% if b.fonction %}<span class="badge-fonction">{{ b.fonction }}</span>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

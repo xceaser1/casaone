@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block titre %}Avancement par {{ 'type de dalle' if axe == 'type' else 'niveau' }}{% endblock %}
+{% block sous_entete %}Surfaces prévues, coulées et taux d'avancement{% endblock %}
+
+{% block contenu %}
+<div class="grille-2">
+  <div class="carte">
+    <div class="carte-tete"><h2>Taux d'avancement</h2></div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-avancement"></canvas></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete"><h2>Surfaces prévues / coulées</h2></div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-surfaces"></canvas></div></div>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="carte-tete"><h2>Détail</h2></div>
+  <div class="carte-corps" style="padding:0">
+    <table class="tableau-simple" id="tbl">
+      <thead><tr>
+        <th>{{ 'Type de dalle' if axe == 'type' else 'Niveau' }}</th>
+        <th class="num">Surface prévue (m²)</th>
+        <th class="num">Surface coulée (m²)</th>
+        <th class="num">Reste (m²)</th>
+        <th class="num">Avancement</th>
+      </tr></thead>
+      <tbody><tr><td colspan="5" class="chargement">Chargement…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const AXE = '{{ axe }}';
+(async function () {
+  const { donnees } = await api('/api/diagrammes/' + AXE);
+  const cle = AXE === 'type' ? 'type' : 'niveau';
+  const etiquettes = donnees.map(d => AXE === 'type' ? d.type.replace('Dalle ', '') : d.niveau);
+
+  document.querySelector('#tbl tbody').innerHTML = donnees.map(d => `
+    <tr><td>${echapper(d[cle])}</td>
+      <td class="num">${nombre(d.total, 0)}</td>
+      <td class="num">${nombre(d.coule, 0)}</td>
+      <td class="num">${nombre(d.total - d.coule, 0)}</td>
+      <td class="num">${pourcent(d.avancement)}</td></tr>`).join('');
+
+  new Chart(document.getElementById('g-avancement'), {
+    type: 'bar',
+    data: {
+      labels: etiquettes,
+      datasets: [{ data: donnees.map(d => d.avancement),
+        backgroundColor: donnees.map(d => d.avancement >= 90 ? T.vertFonce : d.avancement > 0 ? T.vert : T.vert20),
+        borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: AXE === 'type' ? 'y' : 'x',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => pourcent(c.raw) } } },
+      scales: AXE === 'type'
+        ? { x: { ...AXE_SOBRE, beginAtZero: true, max: 100, ticks: { callback: v => v + ' %' } }, y: AXE_NU }
+        : { x: AXE_NU, y: { ...AXE_SOBRE, beginAtZero: true, max: 100, ticks: { callback: v => v + ' %' } } }
+    }
+  });
+
+  new Chart(document.getElementById('g-surfaces'), {
+    type: 'bar',
+    data: {
+      labels: etiquettes,
+      datasets: [
+        { label: 'Prévu', data: donnees.map(d => d.total), backgroundColor: T.vert20, borderRadius: 3 },
+        { label: 'Coulé', data: donnees.map(d => d.coule), backgroundColor: T.vertFonce, borderRadius: 3 }
+      ]
+    },
+    options: {
+      plugins: { legend: { position: 'bottom' } },
+      scales: { x: AXE_NU, y: { ...AXE_SOBRE, beginAtZero: true, ticks: { callback: v => nombre(v, 0) } } }
+    }
+  });
+})();
+</script>
+{% endblock %}

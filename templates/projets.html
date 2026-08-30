@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block titre %}Projets{% endblock %}
+{% block sous_entete %}Portefeuille des chantiers — {{ projets|length }} projet{{ 's' if projets|length > 1 }}{% endblock %}
+
+{% macro champs_projet(p=None) %}
+  <div class="form-grille">
+    <label class="champ">
+      <span>Code {% if not p %}<em>(ex : CFAO)</em>{% endif %}</span>
+      {% if p %}
+        <input type="text" value="{{ p.code }}" disabled>
+      {% else %}
+        <input type="text" name="code" maxlength="24" required placeholder="CFAO" style="text-transform:uppercase">
+      {% endif %}
+    </label>
+    <label class="champ">
+      <span>Nom du projet</span>
+      <input type="text" name="nom" maxlength="120" required value="{{ p.nom if p }}" placeholder="CASA ONE">
+    </label>
+    <label class="champ">
+      <span>Client</span>
+      <input type="text" name="client" maxlength="120" value="{{ p.client if p }}" placeholder="CFAO">
+    </label>
+    <label class="champ">
+      <span>Ville</span>
+      <input type="text" name="ville" maxlength="80" value="{{ p.ville if p }}" placeholder="Casablanca">
+    </label>
+    <label class="champ">
+      <span>Statut</span>
+      <select name="statut">
+        {% for code, (libelle, _classe) in statuts.items() %}
+        <option value="{{ code }}" {{ 'selected' if p and p.statut == code or (not p and code == 'en_cours') }}>{{ libelle }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="champ">
+      <span>Avancement (%)</span>
+      <input type="number" name="avancement" min="0" max="100" step="0.1" value="{{ p.avancement_pct if p else 0 }}">
+    </label>
+    <label class="champ">
+      <span>Budget (MAD)</span>
+      <input type="number" name="budget" min="0" step="1000" value="{{ p.budget|int if p and p.budget else '' }}" placeholder="0">
+    </label>
+    <label class="champ">
+      <span>Couleur</span>
+      <input type="color" name="couleur" value="{{ p.couleur if p else '#14683f' }}">
+    </label>
+    <label class="champ">
+      <span>Date de début</span>
+      <input type="date" name="date_debut" value="{{ p.date_debut.isoformat() if p and p.date_debut }}">
+    </label>
+    <label class="champ">
+      <span>Date de fin prévue</span>
+      <input type="date" name="date_fin" value="{{ p.date_fin.isoformat() if p and p.date_fin }}">
+    </label>
+    <label class="champ">
+      <span>Code de pointage <em>(auto-scan)</em></span>
+      <input type="text" name="pin_pointage" maxlength="12" value="{{ p.pin_pointage if p and p.pin_pointage }}" placeholder="vide = libre" inputmode="numeric" autocomplete="off">
+    </label>
+  </div>
+{% endmacro %}
+
+{% block contenu %}
+<div class="projets-barre">
+  <p class="projets-info">Sélectionnez un projet pour le rendre actif, ou créez-en un nouveau.</p>
+  {% if peut('projets', 'create') %}
+  <button class="btn btn-fonce" onclick="ouvrirModale('modale-nouveau')">{{ ico('plus') }} Nouveau projet</button>
+  {% endif %}
+</div>
+
+<div class="projets-grille">
+  {% for p in projets %}
+  <article class="projet-carte {{ 'est-actif' if projet_actif and p.id == projet_actif.id }}" style="--accent: {{ p.couleur }}">
+    <header class="projet-carte-tete">
+      <span class="projet-avatar">{{ p.initiales }}</span>
+      <div class="projet-carte-titre">
+        <b>{{ p.nom }}</b>
+        <small>{{ p.client or '—' }}{% if p.ville %} · {{ p.ville }}{% endif %}</small>
+      </div>
+      <span class="badge-statut b-{{ p.statut_classe }}">{{ p.statut_libelle }}</span>
+    </header>
+
+    <div class="projet-avancement">
+      <div class="projet-avancement-tete"><span>Avancement</span><b>{{ p.avancement_pct }} %</b></div>
+      <div class="jauge important"><i style="width: {{ p.avancement_pct }}%"></i></div>
+    </div>
+
+    <dl class="projet-meta">
+      <div><dt>Budget</dt><dd>{% if p.budget %}{{ "{:,.0f}".format(p.budget).replace(',', ' ') }} MAD{% else %}—{% endif %}</dd></div>
+      <div><dt>Début</dt><dd>{{ p.date_debut.strftime('%d/%m/%Y') if p.date_debut else '—' }}</dd></div>
+      <div><dt>Fin prévue</dt><dd>{{ p.date_fin.strftime('%d/%m/%Y') if p.date_fin else '—' }}</dd></div>
+      <div><dt>Code</dt><dd>{{ p.code }}{% if p.est_principal %} · principal{% endif %}</dd></div>
+    </dl>
+
+    <footer class="projet-carte-pied">
+      {% if projet_actif and p.id == projet_actif.id %}
+        <span class="projet-actif-tag">{{ ico('validation') }} Projet actif</span>
+      {% else %}
+        <form method="post" action="{{ url_for('projets.activer', projet_id=p.id) }}">
+          <input type="hidden" name="suivant" value="{{ url_for('projets.index') }}">
+          <button type="submit" class="btn btn-vert mini">Rendre actif</button>
+        </form>
+      {% endif %}
+      {% if peut('projets', 'edit') %}
+      <button class="btn mini" onclick="ouvrirModale('modale-edit-{{ p.id }}')">Modifier</button>
+      {% endif %}
+    </footer>
+  </article>
+  {% endfor %}
+</div>
+
+{% if not projets %}
+<div class="carte" style="padding:40px;text-align:center;color:var(--doux)">Aucun projet pour l'instant.</div>
+{% endif %}
+
+{# --------------------------------------------------------- Modale creation #}
+{% if peut('projets', 'create') %}
+<div class="modale-fond" id="modale-nouveau">
+  <form class="modale large" method="post" action="{{ url_for('projets.creer') }}">
+    <h3>Nouveau projet</h3>
+    <div class="corps">{{ champs_projet() }}</div>
+    <div class="pied">
+      <button type="button" class="btn" data-fermer>Annuler</button>
+      <button type="submit" class="btn btn-fonce">Créer le projet</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{# ----------------------------------------------------- Modales modification #}
+{% if peut('projets', 'edit') %}
+{% for p in projets %}
+<div class="modale-fond" id="modale-edit-{{ p.id }}">
+  <form class="modale large" method="post" action="{{ url_for('projets.modifier', projet_id=p.id) }}">
+    <h3>Modifier — {{ p.nom }}</h3>
+    <div class="corps">{{ champs_projet(p) }}</div>
+    <div class="pied">
+      {% if not p.est_principal %}
+      <button type="submit" name="action" value="archiver" class="btn btn-danger"
+              onclick="return confirmerSuppression('Archiver le projet « {{ p.nom }} » ?')" style="margin-right:auto">Archiver</button>
+      {% endif %}
+      <button type="button" class="btn" data-fermer>Annuler</button>
+      <button type="submit" name="action" value="profil" class="btn btn-fonce">Enregistrer</button>
+    </div>
+  </form>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

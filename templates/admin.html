@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% block titre %}Administration{% endblock %}
+{% block sous_entete %}Utilisateurs, permissions et import Excel{% endblock %}
+
+{% block contenu %}
+<div class="carte" style="margin-bottom:16px">
+  <div class="onglets">
+    <button class="actif" data-onglet="utilisateurs">Utilisateurs</button>
+    <button data-onglet="import">Import Excel</button>
+    <button data-onglet="pointage">Import pointage</button>
+    <button data-onglet="journal">Journal des imports</button>
+  </div>
+
+  <!-- ------------------------------------------------------ Utilisateurs -->
+  <section data-panneau="utilisateurs">
+    <div class="barre-outils">
+      <span style="color:var(--doux);font-size:.85rem">{{ utilisateurs|length }} compte(s)</span>
+      <button class="btn btn-fonce" style="margin-left:auto" onclick="ouvrirModale('m-nouvel-utilisateur')">Créer un utilisateur</button>
+    </div>
+    <div class="tableau-enveloppe">
+      <table class="donnees">
+        <thead><tr>
+          <th>Identifiant</th><th>Nom</th><th>E-mail</th><th>Rôle</th><th>État</th>
+          <th>Dernière connexion</th><th style="text-align:right">Actions</th>
+        </tr></thead>
+        <tbody>
+        {% for u in utilisateurs %}
+          <tr>
+            <td><b>{{ u.username }}</b></td>
+            <td>{{ u.nom_complet or '—' }}</td>
+            <td>{{ u.email or '—' }}</td>
+            <td><span class="pastille {{ 'valide' if u.est_admin else 'cours' }}">{{ u.role.nom }}</span></td>
+            <td>{{ 'Actif' if u.actif else 'Désactivé' }}</td>
+            <td>{{ u.derniere_connexion.strftime('%d/%m/%Y %H:%M') if u.derniere_connexion else 'Jamais' }}</td>
+            <td style="text-align:right;white-space:nowrap">
+              <button class="btn mini" data-editer="{{ u.id }}"
+                      data-nom="{{ u.nom_complet or '' }}" data-email="{{ u.email or '' }}"
+                      data-role="{{ u.role_id }}" data-username="{{ u.username }}">Modifier</button>
+              {% if not u.est_admin %}
+              <button class="btn mini" data-droits="{{ u.id }}" data-username="{{ u.username }}">Permissions</button>
+              {% endif %}
+              <form method="post" action="{{ url_for('admin.modifier_utilisateur', user_id=u.id) }}" style="display:inline">
+                <input type="hidden" name="action" value="activer">
+                <button class="btn mini" type="submit">{{ 'Désactiver' if u.actif else 'Activer' }}</button>
+              </form>
+              <form method="post" action="{{ url_for('admin.modifier_utilisateur', user_id=u.id) }}" style="display:inline"
+                    onsubmit="return confirmerSuppression('Supprimer le compte « {{ u.username }} » ?')">
+                <input type="hidden" name="action" value="supprimer">
+                <button class="btn mini btn-danger" type="submit">Supprimer</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------- Import Excel -->
+  <section data-panneau="import" hidden>
+    <div class="carte-corps">
+      <div class="alerte info">
+        L'import lit le classeur sans jamais le modifier. Rien n'est écrit en base avant votre confirmation ;
+        si l'import échoue, les données déjà présentes sont conservées.
+      </div>
+      <p style="color:var(--doux);font-size:.85rem">
+        Dernier import : <b>{{ dernier_import or 'aucun' }}</b>
+        {% if fichier_source %} — fichier <b>{{ fichier_source }}</b>{% endif %}
+      </p>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0">
+        <input type="file" id="fichier" accept=".xlsx,.xlsm" style="max-width:340px">
+        <button class="btn" id="btn-apercu">Analyser le fichier</button>
+        {% if fichier_source %}
+        <button class="btn" id="btn-sync" style="margin-left:auto">Resynchroniser le dernier fichier</button>
+        {% endif %}
+      </div>
+
+      <div id="resultat-apercu"></div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------ Import pointage -->
+  <section data-panneau="pointage" hidden>
+    <div class="carte-corps">
+      <div class="alerte info">
+        Importez le canevas de pointage mensuel (fichier <b>canevas_&lt;Mois&gt;_AAAA.xlsx</b>).
+        Le mois est reconnu automatiquement depuis la feuille (ex. « 08-2026 »). Réimporter le même
+        mois remplace ses données ; les autres mois sont conservés.
+      </div>
+      <div class="alerte erreur">
+        ⚠ Ce fichier contient des données personnelles (noms, CIN). L'accès à la main-d'œuvre est
+        réservé aux comptes disposant de la permission dédiée. Ne l'accordez qu'aux personnes habilitées.
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0">
+        <input type="file" id="fichier-pointage" accept=".xlsx,.xlsm" style="max-width:340px">
+        <button class="btn" id="btn-apercu-pointage">Analyser le canevas</button>
+      </div>
+
+      <div id="resultat-pointage"></div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- Journal -->
+  <section data-panneau="journal" hidden>
+    <div class="carte-corps" style="padding:0">
+      <table class="tableau-simple">
+        <thead><tr><th>Date</th><th>Fichier</th><th>Par</th><th>Statut</th><th>Résumé</th></tr></thead>
+        <tbody>
+        {% for j in imports %}
+          <tr>
+            <td>{{ j.date_import.strftime('%d/%m/%Y %H:%M') }}</td>
+            <td>{{ j.fichier }}</td>
+            <td>{{ j.utilisateur }}</td>
+            <td><span class="pastille {{ 'valide' if j.statut == 'OK' else 'non' }}">{{ j.statut }}</span></td>
+            <td style="font-size:.8rem;color:var(--doux)">{{ j.resume }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5"><div class="vide"><b>Aucun import enregistré</b>Importez un classeur pour alimenter la base.</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+{% set roles_desc = {
+  'ADMIN': "Accès complet : utilisateurs, permissions, imports, toutes les données.",
+  'USER': "Consultation des tableaux de bord et saisie des livraisons béton.",
+  'POINTEUR': "Pointage uniquement : scanner les badges, présences, export."
+} %}
+
+<!-- Modale : nouvel utilisateur -->
+<div class="modale-fond" id="m-nouvel-utilisateur">
+  <div class="modale">
+    <h3>Créer un utilisateur</h3>
+    <form method="post" action="{{ url_for('admin.creer_utilisateur') }}">
+      <div class="corps">
+        <label class="champ"><span>Identifiant</span><input name="username" required minlength="3" autocomplete="off"></label>
+        <label class="champ"><span>Nom complet</span><input name="nom_complet"></label>
+        <label class="champ"><span>E-mail</span><input type="email" name="email"></label>
+
+        <div class="champ"><span>Rôle — définit ce que la personne peut faire</span>
+          <div class="roles-choix">
+            {% for r in roles %}
+            <label class="role-carte">
+              <input type="radio" name="role_id" value="{{ r.id }}" required {{ 'checked' if r.nom == 'USER' }}>
+              <span class="role-info">
+                <b>{{ r.nom }}{% if r.est_admin %} <em class="role-tag">admin</em>{% endif %}</b>
+                <small>{{ roles_desc.get(r.nom) or r.libelle }}</small>
+              </span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <label class="champ"><span>Mot de passe provisoire</span>
+          <input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
+        <p style="color:var(--doux);font-size:.8rem;margin:2px 0 0">
+          Vous pourrez affiner les droits au cas par cas ensuite via « Permissions ».
+        </p>
+      </div>
+      <div class="pied">
+        <button class="btn" type="button" data-fermer="m-nouvel-utilisateur">Annuler</button>
+        <button class="btn btn-fonce" type="submit">Créer le compte</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modale : modifier un utilisateur -->
+<div class="modale-fond" id="m-editer">
+  <div class="modale">
+    <h3>Modifier <span id="e-username"></span></h3>
+    <form method="post" id="f-editer">
+      <div class="corps">
+        <input type="hidden" name="action" value="profil">
+        <label class="champ"><span>Nom complet</span><input name="nom_complet" id="e-nom"></label>
+        <label class="champ"><span>E-mail</span><input type="email" name="email" id="e-email"></label>
+        <label class="champ"><span>Rôle</span>
+          <select name="role_id" id="e-role">
+            {% for r in roles %}<option value="{{ r.id }}">{{ r.nom }} — {{ roles_desc.get(r.nom) or r.libelle }}</option>{% endfor %}
+          </select></label>
+      </div>
+      <div class="pied">
+        <button class="btn" type="button" data-fermer="m-editer">Annuler</button>
+        <button class="btn btn-fonce" type="submit">Enregistrer</button>
+      </div>
+    </form>
+    <form method="post" id="f-mdp" style="border-top:1px solid var(--bord)">
+      <div class="corps">
+        <input type="hidden" name="action" value="mot_de_passe">
+        <label class="champ"><span>Réinitialiser le mot de passe</span>
+          <input type="password" name="password" minlength="6" placeholder="Nouveau mot de passe"></label>
+      </div>
+      <div class="pied"><button class="btn" type="submit">Réinitialiser</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Modale : permissions -->
+<div class="modale-fond" id="m-droits">
+  <div class="modale large">
+    <h3>Permissions de <span id="d-username"></span></h3>
+    <form method="post" id="f-droits">
+      <div class="corps">
+        <input type="hidden" name="action" value="permissions">
+        <p style="color:var(--doux);font-size:.83rem;margin-top:0">
+          Cochez les actions autorisées. Les droits sont vérifiés côté serveur à chaque requête.
+        </p>
+        <div class="grille-perm">
+          <div></div>
+          {% for a in actions %}<div class="entete">{{ a }}</div>{% endfor %}
+          {% for module, libelle in modules %}
+            <div>{{ libelle }}</div>
+            {% for a in actions %}
+            <div class="cellule">
+              <input type="checkbox" name="permissions" value="{{ module }}.{{ a }}" data-code="{{ module }}.{{ a }}">
+            </div>
+            {% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+      <div class="pied">
+        <button class="btn" type="button" data-fermer="m-droits">Annuler</button>
+        <button class="btn btn-fonce" type="submit">Enregistrer les permissions</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Onglets */
+document.querySelectorAll('[data-onglet]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-onglet]').forEach(x => x.classList.toggle('actif', x === b));
+  document.querySelectorAll('[data-panneau]').forEach(p => { p.hidden = p.dataset.panneau !== b.dataset.onglet; });
+}));
+
+/* Modifier un utilisateur */
+document.querySelectorAll('[data-editer]').forEach(b => b.addEventListener('click', () => {
+  const id = b.dataset.editer;
+  document.getElementById('e-username').textContent = b.dataset.username;
+  document.getElementById('e-nom').value = b.dataset.nom;
+  document.getElementById('e-email').value = b.dataset.email;
+  document.getElementById('e-role').value = b.dataset.role;
+  document.getElementById('f-editer').action = `/admin/utilisateurs/${id}`;
+  document.getElementById('f-mdp').action = `/admin/utilisateurs/${id}`;
+  ouvrirModale('m-editer');
+}));
+
+/* Permissions */
+document.querySelectorAll('[data-droits]').forEach(b => b.addEventListener('click', async () => {
+  const id = b.dataset.droits;
+  document.getElementById('d-username').textContent = b.dataset.username;
+  document.getElementById('f-droits').action = `/admin/utilisateurs/${id}`;
+  const { codes } = await api(`/admin/utilisateurs/${id}/permissions`);
+  document.querySelectorAll('#f-droits input[type=checkbox]').forEach(c => {
+    c.checked = codes.includes(c.dataset.code);
+  });
+  ouvrirModale('m-droits');
+}));
+
+/* ---------------------------------------------------------- Import Excel */
+let fichierServeur = null;
+
+document.getElementById('btn-apercu')?.addEventListener('click', async () => {
+  const input = document.getElementById('fichier');
+  if (!input.files.length) { notifier('Choisissez un fichier .xlsx.', 'erreur'); return; }
+  const zone = document.getElementById('resultat-apercu');
+  zone.innerHTML = '<div class="chargement">Analyse du classeur…</div>';
+
+  const donnees = new FormData();
+  donnees.append('fichier', input.files[0]);
+  const rep = await fetch('/admin/import/apercu', { method: 'POST', body: donnees });
+  const d = await rep.json();
+  if (!rep.ok) { zone.innerHTML = `<div class="alerte erreur">${echapper(d.erreur)}</div>`; return; }
+
+  fichierServeur = d.fichier;
+  zone.innerHTML = `
+    <h3 style="margin:18px 0 8px">Aperçu — ${d.feuilles.length} feuille(s) détectée(s)</h3>
+    <table class="tableau-simple">
+      <thead><tr><th>Feuille</th><th class="num">Lignes réelles</th><th class="num">Colonnes</th><th>État</th></tr></thead>
+      <tbody>${d.feuilles.map(f => `
+        <tr><td><b>${echapper(f.feuille)}</b></td>
+          <td class="num">${nombre(f.lignes_non_vides, 0)}</td>
+          <td class="num">${f.colonnes}</td>
+          <td>${f.vide
+            ? '<span class="pastille non">Vide — ignorée</span>'
+            : f.reconnue ? '<span class="pastille valide">Reconnue</span>'
+                         : '<span class="pastille cours">Non utilisée</span>'}</td></tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-fonce" id="btn-confirmer">Confirmer et importer</button>
+      <button class="btn" onclick="document.getElementById('resultat-apercu').innerHTML=''">Annuler</button>
+    </div>`;
+
+  document.getElementById('btn-confirmer').addEventListener('click', async e => {
+    e.target.disabled = true;
+    e.target.textContent = 'Import en cours…';
+    try {
+      const r = await api('/admin/import/confirmer', {
+        method: 'POST', body: JSON.stringify({ fichier: fichierServeur })
+      });
+      notifier('Import terminé : ' + Object.entries(r.resume).map(([k, v]) => `${k} ${v}`).join(', '));
+      setTimeout(() => location.reload(), 1200);
+    } catch (err) {
+      zone.insertAdjacentHTML('afterbegin',
+        `<div class="alerte erreur">Import annulé, les données existantes sont conservées. ${echapper(err.message)}</div>`);
+      e.target.disabled = false;
+      e.target.textContent = 'Confirmer et importer';
+    }
+  });
+});
+
+/* ------------------------------------------------- Import du pointage */
+let fichierPointage = null;
+
+document.getElementById('btn-apercu-pointage')?.addEventListener('click', async () => {
+  const input = document.getElementById('fichier-pointage');
+  if (!input.files.length) { notifier('Choisissez un canevas de pointage.', 'erreur'); return; }
+  const zone = document.getElementById('resultat-pointage');
+  zone.innerHTML = '<div class="chargement">Analyse du canevas…</div>';
+
+  const donnees = new FormData();
+  donnees.append('fichier', input.files[0]);
+  const rep = await fetch('/admin/import/pointage/apercu', { method: 'POST', body: donnees });
+  const d = await rep.json();
+  if (!rep.ok) { zone.innerHTML = `<div class="alerte erreur">${echapper(d.erreur)}</div>`; return; }
+
+  fichierPointage = d.fichier;
+  zone.innerHTML = `
+    <h3 style="margin:18px 0 8px">Aperçu du pointage</h3>
+    <table class="tableau-simple">
+      <tbody>
+        <tr><td>Feuille détectée</td><td><b>${echapper(d.feuille)}</b></td></tr>
+        <tr><td>Mois</td><td><b>${moisLisible(d.mois)}</b> (${echapper(d.mois)})</td></tr>
+        <tr><td>Ouvriers</td><td><b>${nombre(d.ouvriers, 0)}</b></td></tr>
+        <tr><td>Jours pointés</td><td>${d.jours}</td></tr>
+      </tbody>
+    </table>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-fonce" id="btn-confirmer-pointage">Confirmer et importer</button>
+      <button class="btn" onclick="document.getElementById('resultat-pointage').innerHTML=''">Annuler</button>
+    </div>`;
+
+  document.getElementById('btn-confirmer-pointage').addEventListener('click', async e => {
+    e.target.disabled = true;
+    e.target.textContent = 'Import en cours…';
+    try {
+      const r = await api('/admin/import/pointage/confirmer', {
+        method: 'POST', body: JSON.stringify({ fichier: fichierPointage })
+      });
+      notifier(`Pointage ${moisLisible(r.resume.mois)} importé : ${r.resume.ouvriers} ouvriers.`);
+      setTimeout(() => location.reload(), 1300);
+    } catch (err) {
+      zone.insertAdjacentHTML('afterbegin',
+        `<div class="alerte erreur">Import annulé, données existantes conservées. ${echapper(err.message)}</div>`);
+      e.target.disabled = false;
+      e.target.textContent = 'Confirmer et importer';
+    }
+  });
+});
+
+document.getElementById('btn-sync')?.addEventListener('click', async e => {
+  if (!window.confirm('Recharger les données depuis le dernier fichier importé ?')) return;
+  e.target.disabled = true;
+  try {
+    const r = await api('/admin/import/synchroniser', { method: 'POST' });
+    notifier('Synchronisation terminée.');
+    setTimeout(() => location.reload(), 1000);
+  } catch (err) {
+    notifier(err.message, 'erreur');
+    e.target.disabled = false;
+  }
+});
+</script>
+{% endblock %}

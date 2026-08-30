@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block titre %}Dashboard{% endblock %}
+{% block sous_entete %}Vue d'ensemble du chantier{% endblock %}
+
+{% block contenu %}
+<div class="grille-kpi" id="kpis">
+  <div class="chargement">Chargement des indicateurs…</div>
+</div>
+
+<div class="grille-2">
+  <div class="carte">
+    <div class="carte-tete">
+      <h2>Bétonnage mensuel</h2>
+      <div class="legende">
+        <span><i style="background:var(--vert-40)"></i>Surface du mois</span>
+        <span><i style="background:var(--vert-fonce)"></i>Cumul</span>
+      </div>
+    </div>
+    <div class="carte-corps"><div class="zone-graph"><canvas id="g-mensuel"></canvas></div></div>
+  </div>
+
+  <!-- Signature : la coupe du projet, un niveau par ligne -->
+  <div class="carte">
+    <div class="carte-tete">
+      <h2>Coupe du projet</h2>
+      <small style="color:var(--doux)">Avancement par niveau</small>
+    </div>
+    <div class="carte-corps"><div class="coupe-projet" id="coupe"></div></div>
+  </div>
+</div>
+
+<div class="grille-3">
+  <div class="carte">
+    <div class="carte-tete"><h2>Avancement par type de dalle</h2></div>
+    <div class="carte-corps"><div class="zone-graph courte"><canvas id="g-type"></canvas></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete"><h2>Validation des plans</h2></div>
+    <div class="carte-corps"><div class="zone-graph courte"><canvas id="g-plans"></canvas></div></div>
+  </div>
+  <div class="carte">
+    <div class="carte-tete"><h2>Surfaces par bloc</h2></div>
+    <div class="carte-corps"><div class="zone-graph courte"><canvas id="g-blocs"></canvas></div></div>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="carte-tete">
+    <h2>Décomptes cumulés</h2>
+    <a class="btn mini" href="{{ url_for('pages.couts') }}">Détail des coûts</a>
+  </div>
+  <div class="carte-corps"><div class="zone-graph courte"><canvas id="g-couts"></canvas></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ICO = {
+  trend:  '<path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/>',
+  layers: '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 12l10 5 10-5M2 17l10 5 10-5"/>',
+  reste:  '<path d="M5 3h14M5 21h14M7 3v4l5 5 5-5V3M7 21v-4l5-5 5 5v4"/>',
+  grille: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  check:  '<path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8.5 13.5l2.5 2.5 4.5-5"/>',
+  argent: '<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  goutte: '<path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11z"/>'
+};
+function icone(cle) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICO[cle] || ''}</svg>`;
+}
+function carteKpi({ lib, val, unite, note, jauge, accent, important, ic, couleur }) {
+  return `<div class="kpi ${accent ? 'accent' : ''}">
+    <span class="kpi-ic" ${accent ? '' : `style="background:${couleur}"`}>${icone(ic)}</span>
+    <div class="kpi-body">
+      <span class="lib">${lib}</span>
+      <div class="val">${val}${unite ? `<small>${unite}</small>` : ''}</div>
+      ${jauge !== undefined ? `<div class="jauge ${important ? 'important' : ''}"><i style="width:${Math.min(jauge, 100)}%"></i></div>` : ''}
+      ${note ? `<div class="note">${note}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+(async function () {
+  let d;
+  try {
+    d = await api('/api/dashboard');
+  } catch (e) {
+    document.getElementById('kpis').innerHTML =
+      `<div class="alerte erreur">Impossible de charger les indicateurs : ${echapper(e.message)}</div>`;
+    return;
+  }
+  const k = d.kpis;
+
+  document.getElementById('kpis').innerHTML = [
+    carteKpi({ lib: 'Avancement planchers', val: pourcent(k.avancement), jauge: k.avancement, accent: true, important: true,
+               ic: 'trend', note: `${nombre(k.surface_coulee, 0)} m² coulés sur ${nombre(k.surface_totale, 0)} m²` }),
+    carteKpi({ lib: 'Surface totale planchers', val: nombre(k.surface_totale, 0), unite: 'm²', ic: 'layers', couleur: '#0ea5e9',
+               note: `${k.nb_zones} zones · ${k.nb_blocs} blocs · hors dallage` }),
+    carteKpi({ lib: 'Reste à couler', val: nombre(k.surface_restante, 0), unite: 'm²', ic: 'reste', couleur: '#f97316',
+               note: 'Planchers non encore bétonnés' }),
+    carteKpi({ lib: 'Dallage', val: pourcent(k.dallage_avancement), jauge: k.dallage_avancement, ic: 'grille', couleur: '#8b5cf6',
+               note: `${nombre(k.dallage_coulee, 0)} m² sur ${nombre(k.dallage_totale, 0)} m²` }),
+    carteKpi({ lib: 'Plans validés', val: pourcent(k.plans_valides_pct), jauge: k.plans_valides_pct, ic: 'check', couleur: '#3b82f6',
+               note: `${nombre(k.plans_valides_surface, 0)} m² de plans validés` }),
+    carteKpi({ lib: 'Montant payé', val: nombre(k.montant_paye, 0), unite: 'MAD', ic: 'argent', couleur: '#14b8a6',
+               jauge: k.consommation_pct, important: true,
+               note: `${pourcent(k.consommation_pct)} du marché (${nombre(k.montant_marche, 0)} MAD)` }),
+    carteKpi({ lib: 'Coulages enregistrés', val: nombre(k.nb_coulages, 0), ic: 'goutte', couleur: '#ec4899',
+               note: `Dernier mois renseigné : ${moisLisible(k.dernier_mois)}` })
+  ].join('');
+
+  /* Coupe du projet : signature visuelle du dashboard */
+  document.getElementById('coupe').innerHTML = d.avancement_niveau.map(n => `
+    <div class="coupe-ligne ${n.avancement >= 90 ? 'forte' : ''}">
+      <span class="niv">${echapper(n.niveau)}</span>
+      <span class="barre"><i style="width:${Math.min(n.avancement, 100)}%"></i></span>
+      <span class="pc">${pourcent(n.avancement)}</span>
+    </div>`).join('');
+
+  /* Betonnage mensuel : barres + cumul */
+  new Chart(document.getElementById('g-mensuel'), {
+    data: {
+      labels: d.betonnage_mensuel.map(m => moisLisible(m.mois)),
+      datasets: [
+        { type: 'bar', label: 'Surface du mois (m²)', data: d.betonnage_mensuel.map(m => m.surface),
+          backgroundColor: T.vert40, borderRadius: 4, order: 2 },
+        { type: 'line', label: 'Cumul (m²)', data: d.betonnage_mensuel.map(m => m.cumul),
+          borderColor: T.vertFonce, backgroundColor: T.vertFonce, borderWidth: 2,
+          pointRadius: 0, tension: .3, yAxisID: 'y2', order: 1 }
+      ]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: AXE_NU,
+        y: { ...AXE_SOBRE, beginAtZero: true, ticks: { callback: v => nombre(v, 0) } },
+        y2: { position: 'right', grid: { display: false }, border: { display: false },
+              beginAtZero: true, ticks: { callback: v => nombre(v, 0) } }
+      }
+    }
+  });
+
+  /* Avancement par type de dalle */
+  new Chart(document.getElementById('g-type'), {
+    type: 'bar',
+    data: {
+      labels: d.avancement_type.map(t => t.type.replace('Dalle ', '')),
+      datasets: [{ data: d.avancement_type.map(t => t.avancement),
+                   backgroundColor: T.vert, borderRadius: 4, barThickness: 26 }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => pourcent(c.raw) } } },
+      scales: { x: { ...AXE_SOBRE, beginAtZero: true, max: 100, ticks: { callback: v => v + ' %' } }, y: AXE_NU }
+    }
+  });
+
+  /* Statuts de validation des plans */
+  const couleurs = { 'Valide': T.vertFonce, 'En Cours': T.ambre, 'Non Valide': T.rouge };
+  new Chart(document.getElementById('g-plans'), {
+    type: 'doughnut',
+    data: {
+      labels: d.statuts_validation.map(s => s.statut === 'Valide' ? 'Validé' : s.statut === 'Non Valide' ? 'Non validé' : s.statut),
+      datasets: [{ data: d.statuts_validation.map(s => s.nombre),
+                   backgroundColor: d.statuts_validation.map(s => couleurs[s.statut] || T.vert20),
+                   borderWidth: 0 }]
+    },
+    options: { cutout: '62%', plugins: { legend: { position: 'bottom' } } }
+  });
+
+  /* Surfaces par bloc : prevu vs coule */
+  new Chart(document.getElementById('g-blocs'), {
+    type: 'bar',
+    data: {
+      labels: d.repartition_bloc.map(b => b.bloc),
+      datasets: [
+        { label: 'Prévu', data: d.repartition_bloc.map(b => b.total), backgroundColor: T.vert20, borderRadius: 3 },
+        { label: 'Coulé', data: d.repartition_bloc.map(b => b.coule), backgroundColor: T.vertFonce, borderRadius: 3 }
+      ]
+    },
+    options: {
+      plugins: { legend: { position: 'bottom' } },
+      scales: { x: AXE_NU, y: { ...AXE_SOBRE, beginAtZero: true, ticks: { callback: v => nombre(v, 0) } } }
+    }
+  });
+
+  /* Decomptes cumules */
+  new Chart(document.getElementById('g-couts'), {
+    data: {
+      labels: d.couts.map(c => c.libelle),
+      datasets: [
+        { type: 'bar', label: 'Décompte (MAD)', data: d.couts.map(c => c.montant),
+          backgroundColor: T.vert40, borderRadius: 4 },
+        { type: 'line', label: 'Cumul payé (MAD)', data: d.couts.map(c => c.cumul),
+          borderColor: T.vertFonce, borderWidth: 2, pointRadius: 0, tension: .25, yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      plugins: { legend: { position: 'bottom' },
+                 tooltip: { callbacks: { label: c => `${c.dataset.label} : ${monnaie(c.raw)}` } } },
+      scales: {
+        x: AXE_NU,
+        y: { ...AXE_SOBRE, beginAtZero: true, ticks: { callback: v => nombre(v / 1e6, 0) + ' M' } },
+        y2: { position: 'right', grid: { display: false }, border: { display: false },
+              beginAtZero: true, ticks: { callback: v => nombre(v / 1e6, 0) + ' M' } }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

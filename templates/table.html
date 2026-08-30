@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block titre %}{{ titre }}{% endblock %}
+{% block sous_entete %}<span id="compteur"></span>{% endblock %}
+
+{% block contenu %}
+<div class="carte" id="table-carte"
+     data-cle="{{ spec.cle }}"
+     data-module="{{ spec.module }}"
+     data-fixes='{{ filtres_fixes|tojson }}'
+     data-colonnes='{{ colonnes|tojson }}'>
+
+  <div class="barre-outils">
+    <div class="recherche">
+      {{ ico('recherche') }}
+      <input type="search" id="q" placeholder="Rechercher (bloc, zone, niveau…)" autocomplete="off">
+    </div>
+
+    <label style="display:flex;align-items:center;gap:7px;font-size:.82rem;color:var(--doux);width:auto">
+      Lignes
+      <select id="taille" style="width:auto">
+        <option>10</option><option selected>25</option><option>50</option><option>100</option><option>200</option>
+      </select>
+    </label>
+
+    <button class="btn" id="btn-reset">{{ ico('reset') }} Réinitialiser</button>
+
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      {% if peut(spec.module, 'export') %}
+      <button class="btn" data-export="xlsx">{{ ico('export') }} Excel</button>
+      <button class="btn" data-export="csv">{{ ico('export') }} CSV</button>
+      {% endif %}
+      {% if peut(spec.module, 'create') %}
+      <button class="btn btn-fonce" id="btn-ajouter">{{ ico('plus') }} Ajouter</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="filtres" id="filtres">
+    {% for c in colonnes %}
+      {% if c.filtre == 'select' and c.cle not in filtres_fixes %}
+      <label>{{ c.label }}
+        <select data-filtre="{{ c.cle }}">
+          <option value="">Tous</option>
+          {% for v in filtres.get(c.cle, []) %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+    {% endfor %}
+    {% if spec.cle == 'betonnage' %}
+    <label>Du <input type="date" id="date_min"></label>
+    <label>Au <input type="date" id="date_max"></label>
+    {% endif %}
+  </div>
+
+  <div class="tableau-enveloppe">
+    <table class="donnees" id="tableau">
+      <thead><tr id="entetes"></tr></thead>
+      <tbody id="corps"><tr><td class="chargement" colspan="9">Chargement…</td></tr></tbody>
+      <tfoot id="pied"></tfoot>
+    </table>
+  </div>
+
+  <div class="pagination">
+    <span class="info" id="info-pagination"></span>
+    <div class="pages" id="pages"></div>
+  </div>
+</div>
+
+<!-- Formulaire ajout / modification -->
+<div class="modale-fond" id="m-edition">
+  <div class="modale">
+    <h3 id="m-titre">Ajouter une ligne</h3>
+    <div class="corps">
+      <div id="m-erreurs"></div>
+      <form id="m-form">
+        <label class="champ" data-champ="zone_id"><span>Zone</span>
+          <select name="zone_id">{% for z in zones %}<option value="{{ z.id }}">{{ z.code }} — {{ z.bloc.code }}</option>{% endfor %}</select>
+        </label>
+        <label class="champ" data-champ="niveau_id"><span>Niveau</span>
+          <select name="niveau_id">{% for n in niveaux %}<option value="{{ n.id }}">{{ n.code }}</option>{% endfor %}</select>
+        </label>
+        {% if spec.cle == 'dalles' %}
+        <label class="champ" data-champ="type_dalle"><span>Type de dalle</span>
+          <select name="type_dalle">
+            {% for t in ['Dalle Reticulee', 'Dalle Pleine', 'Dalle Post-Tension', 'Dalle Hourdis'] %}
+            <option value="{{ t }}">{{ t }}</option>{% endfor %}
+          </select>
+        </label>
+        {% endif %}
+        {% if spec.cle == 'betonnage' %}
+        <label class="champ" data-champ="date_coulage"><span>Date de coulage</span>
+          <input type="date" name="date_coulage" required></label>
+        {% endif %}
+        {% if spec.cle == 'validation' %}
+        <label class="champ" data-champ="statut"><span>Statut du plan</span>
+          <select name="statut"><option>Valide</option><option>En Cours</option><option>Non Valide</option></select>
+        </label>
+        <label class="champ" data-champ="surface"><span>Surface (m²)</span>
+          <input type="number" step="0.01" min="0" name="surface"></label>
+        {% endif %}
+        {% if spec.cle in ('surfaces', 'dalles') %}
+        <label class="champ" data-champ="surface_totale"><span>Surface totale (m²)</span>
+          <input type="number" step="0.01" min="0" name="surface_totale"></label>
+        <label class="champ" data-champ="surface_coulee"><span>Surface coulée (m²)</span>
+          <input type="number" step="0.01" min="0" name="surface_coulee"></label>
+        {% endif %}
+        {% if spec.cle == 'betonnage' %}
+        <label class="champ" data-champ="surface"><span>Surface coulée (m²)</span>
+          <input type="number" step="0.01" min="0" name="surface"></label>
+        {% endif %}
+        {% if spec.cle == 'livraisons' %}
+        <label class="champ" data-champ="date_livraison"><span>Date de livraison</span>
+          <input type="date" name="date_livraison" required></label>
+        <label class="champ" data-champ="fournisseur"><span>Fournisseur (centrale)</span>
+          <input type="text" name="fournisseur" placeholder="ex. LafargeHolcim"></label>
+        <label class="champ" data-champ="volume"><span>Volume livré (m³)</span>
+          <input type="number" step="0.01" min="0" name="volume"></label>
+        <label class="champ" data-champ="classe_beton"><span>Classe de béton</span>
+          <input type="text" name="classe_beton" list="classes-beton" placeholder="ex. B25">
+          <datalist id="classes-beton"><option>B20</option><option>B25</option><option>B30</option><option>B35</option><option>B40</option></datalist>
+        </label>
+        <label class="champ" data-champ="bon_livraison"><span>N° de bon de livraison</span>
+          <input type="text" name="bon_livraison"></label>
+        {% endif %}
+        {% if spec.cle == 'engins' %}
+        <label class="champ" data-champ="type_engin"><span>Type d'engin</span>
+          <input type="text" name="type_engin" list="types-engin" placeholder="ex. Grue">
+          <datalist id="types-engin"><option>Grue</option><option>JCB</option><option>Manitou</option><option>Camion</option><option>Bétonnière</option><option>Pelle</option><option>Chargeuse</option></datalist>
+        </label>
+        <label class="champ" data-champ="designation"><span>Désignation / N°</span>
+          <input type="text" name="designation" placeholder="ex. GT-01"></label>
+        <label class="champ" data-champ="marque"><span>Marque / modèle</span>
+          <input type="text" name="marque"></label>
+        <label class="champ" data-champ="etat"><span>État</span>
+          <select name="etat">
+            <option>En service</option><option>En panne</option><option>A l'arret</option><option>En maintenance</option>
+          </select></label>
+        <label class="champ" data-champ="fournisseur"><span>Fournisseur / propriétaire</span>
+          <input type="text" name="fournisseur" placeholder="loué ou en propre"></label>
+        <label class="champ" data-champ="date_entree"><span>Date d'entrée sur chantier</span>
+          <input type="date" name="date_entree"></label>
+        {% endif %}
+      </form>
+    </div>
+    <div class="pied">
+      <button class="btn" data-fermer="m-edition">Annuler</button>
+      <button class="btn btn-fonce" id="m-valider">Enregistrer</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/table.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,131 @@
+/* Utilitaires partages par toutes les pages. */
+
+const CSS = getComputedStyle(document.documentElement);
+const T = {
+  vert: CSS.getPropertyValue('--vert').trim() || '#35a46a',
+  vertFonce: CSS.getPropertyValue('--vert-fonce').trim() || '#14603c',
+  vert40: CSS.getPropertyValue('--vert-40').trim() || '#8fd3ae',
+  vert20: CSS.getPropertyValue('--vert-20').trim() || '#c9e8d7',
+  vert10: CSS.getPropertyValue('--vert-10').trim() || '#e2f2e9',
+  bord: CSS.getPropertyValue('--bord').trim() || '#e4efe8',
+  doux: CSS.getPropertyValue('--doux').trim() || '#6d8378',
+  ambre: '#c88a1e',
+  rouge: '#c0503f'
+};
+
+const nf0 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
+const nf2 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function nombre(v, dec = 2) {
+  if (v === null || v === undefined || v === '') return '—';
+  return dec === 0 ? nf0.format(v) : nf2.format(v);
+}
+function pourcent(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  return nf2.format(v).replace(',00', '') + ' %';
+}
+function monnaie(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  return nf0.format(v) + ' MAD';
+}
+function moisLisible(cle) {
+  if (!cle) return '';
+  const [a, m] = cle.split('-');
+  const noms = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  return noms[parseInt(m, 10) - 1] + ' ' + a.slice(2);
+}
+function echapper(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function notifier(message, type = 'ok') {
+  const zone = document.getElementById('notifs');
+  if (!zone) return;
+  const el = document.createElement('div');
+  el.className = 'notif' + (type === 'erreur' ? ' erreur' : '');
+  el.textContent = message;
+  zone.appendChild(el);
+  setTimeout(() => el.remove(), 3800);
+}
+
+async function api(url, options = {}) {
+  const rep = await fetch(url, {
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    ...options
+  });
+  let donnees = null;
+  try { donnees = await rep.json(); } catch (e) { /* reponse non JSON */ }
+  if (!rep.ok) {
+    const msg = donnees?.erreur || (donnees?.erreurs || []).join(' ') || `Erreur ${rep.status}`;
+    throw new Error(msg);
+  }
+  return donnees;
+}
+
+/* --------------------------------------------------------------- Modale */
+function ouvrirModale(id) { document.getElementById(id)?.classList.add('ouverte'); }
+function fermerModale(id) { document.getElementById(id)?.classList.remove('ouverte'); }
+
+document.addEventListener('click', e => {
+  if (e.target.classList?.contains('modale-fond')) e.target.classList.remove('ouverte');
+  const f = e.target.closest('[data-fermer]');
+  if (f) fermerModale(f.dataset.fermer);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modale-fond.ouverte').forEach(m => m.classList.remove('ouverte'));
+});
+
+/* Confirmation avant toute suppression */
+function confirmerSuppression(texte) {
+  return window.confirm(texte + '\n\nCette action est définitive.');
+}
+
+/* ------------------------------------------- Navigation : retour immediat
+   Au clic sur un lien de la barre laterale, l'onglet devient actif tout de
+   suite (sans attendre le chargement) et une barre de progression fine
+   s'affiche : la sidebar reste "liee" a la page en cours de chargement. */
+(function () {
+  const nav = document.querySelector('.nav');
+  if (!nav) return;
+
+  const barre = document.createElement('div');
+  barre.className = 'barre-chargement';
+  document.body.appendChild(barre);
+
+  nav.addEventListener('click', e => {
+    const lien = e.target.closest('a[href]');
+    if (!lien || lien.target === '_blank' || e.metaKey || e.ctrlKey) return;
+    if (lien.classList.contains('actif')) { e.preventDefault(); return; }
+    nav.querySelectorAll('a.actif').forEach(a => a.classList.remove('actif'));
+    lien.classList.add('actif');
+    barre.classList.add('active');
+  });
+
+  // Le retour arriere restaure l'etat correct de la barre laterale
+  window.addEventListener('pageshow', e => {
+    barre.classList.remove('active');
+    if (e.persisted) location.reload();
+  });
+})();
+
+/* ------------------------------------------------------------ Graphiques */
+if (window.Chart) {
+  Chart.defaults.font.family = CSS.getPropertyValue('--police') || 'sans-serif';
+  Chart.defaults.font.size = 11.5;
+  Chart.defaults.color = T.doux;
+  Chart.defaults.plugins.legend.labels.boxWidth = 10;
+  Chart.defaults.plugins.legend.labels.boxHeight = 10;
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.plugins.tooltip.backgroundColor = '#10241a';
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.cornerRadius = 8;
+  Chart.defaults.maintainAspectRatio = false;
+}
+
+const AXE_SOBRE = {
+  grid: { color: T.bord, drawTicks: false },
+  border: { display: false },
+  ticks: { padding: 8 }
+};
+const AXE_NU = { grid: { display: false }, border: { display: false }, ticks: { padding: 6 } };

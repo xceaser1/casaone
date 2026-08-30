@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accès impossible — {{ societe }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div style="min-height:100vh;display:grid;place-items:center;padding:24px">
+  <div class="carte" style="max-width:420px;text-align:center">
+    <div class="carte-corps">
+      <div class="logo" style="margin:0 auto 16px">URB</div>
+      <h2>{{ message }}</h2>
+      <p style="color:var(--doux)">Si vous pensez qu'il s'agit d'une erreur, contactez un administrateur du système.</p>
+      <a class="btn btn-fonce" href="/" style="margin-top:8px">Retour au dashboard</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>
