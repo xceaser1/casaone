@@ -64,13 +64,27 @@
 <div class="carte">
   <div class="carte-tete">
     <h3>Pointage du {{ jour.strftime('%d/%m/%Y') }}</h3>
-    <span style="color:var(--doux);font-size:.82rem">{{ lignes|length }} pointé{{ 's' if lignes|length > 1 }}</span>
+    <span class="pres-compte"><b id="pres-nb">{{ lignes|length }}</b> sur {{ lignes|length }} pointé{{ 's' if lignes|length > 1 }}</span>
   </div>
 
-  <div class="pres-onglets" id="pres-onglets">
-    <button class="on" data-f="tous">Tous</button>
-    <button data-f="site">Sur site</button>
-    <button data-f="partis">Partis</button>
+  <div class="pres-filtres">
+    <div class="pres-onglets" id="pres-onglets">
+      <button class="on" data-f="tous">Tous</button>
+      <button data-f="site">Sur site</button>
+      <button data-f="partis">Partis</button>
+    </div>
+    <div class="pres-recherche">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="pres-q" type="search" placeholder="Rechercher un nom ou un matricule…" autocomplete="off">
+    </div>
+    {% set metiers = lignes | map(attribute='fonction') | select | unique | sort %}
+    {% if metiers %}
+    <select id="pres-fonction" aria-label="Filtrer par fonction">
+      <option value="">Toutes les fonctions</option>
+      {% for f in metiers %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <button class="btn mini" id="pres-reset" type="button">Réinitialiser</button>
   </div>
 
   <div class="pres-liste">
@@ -78,11 +92,12 @@
       {% set parts = (l.nom or '?').split() %}
       {% set ini = ((parts[0][0] if parts else '?') ~ (parts[1][0] if parts|length > 1 else '')) | upper %}
       {% set etat = 'site' if (l.entree and not l.sortie) else ('partis' if l.sortie else 'absent') %}
-    <div class="pres-c" data-etat="{{ etat }}">
+    <div class="pres-c" data-etat="{{ etat }}" data-fonction="{{ l.fonction or '' }}"
+         data-recherche="{{ ((l.nom or '') ~ ' ' ~ (l.matricule or '') ~ ' ' ~ (l.fonction or '')) | lower }}">
       <span class="pres-av {{ 'sortie' if etat == 'partis' }}">{{ ini }}</span>
       <div class="pres-info">
         <b>{{ l.nom or '—' }}</b>
-        <small>{{ ('Mat. ' ~ l.matricule) if l.matricule else 'Sans matricule' }}</small>
+        <small>{{ ('Mat. ' ~ l.matricule) if l.matricule else 'Sans matricule' }}{% if l.fonction %} · {{ l.fonction }}{% endif %}</small>
       </div>
       <div class="pres-tps">
         {% if etat == 'site' %}<span class="badge-statut b-vert">Sur site</span>
@@ -139,13 +154,58 @@ if (window.Chart) {
   });
 }
 
-/* Onglets de filtre de la liste de pointage */
-document.querySelectorAll('#pres-onglets button').forEach(b => b.addEventListener('click', () => {
-  document.querySelectorAll('#pres-onglets button').forEach(x => x.classList.toggle('on', x === b));
-  const f = b.dataset.f;
-  document.querySelectorAll('.pres-c').forEach(c => {
-    c.style.display = (f === 'tous' || c.dataset.etat === f) ? '' : 'none';
+/* ------------------------------------------- Filtres de la liste de pointage
+   Trois filtres combinables : statut (onglets), recherche libre (nom /
+   matricule / fonction) et fonction. Le compteur suit le resultat. */
+(function () {
+  const cartes  = Array.from(document.querySelectorAll('.pres-c'));
+  const onglets = document.querySelectorAll('#pres-onglets button');
+  const champQ  = document.getElementById('pres-q');
+  const selFn   = document.getElementById('pres-fonction');
+  const compte  = document.getElementById('pres-nb');
+  const liste   = document.querySelector('.pres-liste');
+  if (!cartes.length || !liste) return;
+
+  let etat = 'tous';
+
+  const rien = document.createElement('div');
+  rien.className = 'pres-vide';
+  rien.textContent = 'Aucun ouvrier ne correspond à ces filtres.';
+  rien.hidden = true;
+  liste.appendChild(rien);
+
+  function appliquer() {
+    const q  = (champQ?.value || '').trim().toLowerCase();
+    const fn = selFn?.value || '';
+    let visibles = 0;
+
+    cartes.forEach(c => {
+      const ok =
+        (etat === 'tous' || c.dataset.etat === etat) &&
+        (!fn || c.dataset.fonction === fn) &&
+        (!q || (c.dataset.recherche || '').includes(q));
+      c.style.display = ok ? '' : 'none';
+      if (ok) visibles++;
+    });
+
+    if (compte) compte.textContent = visibles;
+    rien.hidden = visibles > 0;
+  }
+
+  onglets.forEach(b => b.addEventListener('click', () => {
+    onglets.forEach(x => x.classList.toggle('on', x === b));
+    etat = b.dataset.f;
+    appliquer();
+  }));
+  champQ?.addEventListener('input', appliquer);
+  selFn?.addEventListener('change', appliquer);
+  document.getElementById('pres-reset')?.addEventListener('click', () => {
+    if (champQ) champQ.value = '';
+    if (selFn) selFn.value = '';
+    etat = 'tous';
+    onglets.forEach(x => x.classList.toggle('on', x.dataset.f === 'tous'));
+    appliquer();
   });
-}));
+})();
 </script>
 {% endblock %}

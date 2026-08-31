@@ -70,7 +70,7 @@ def _enregistrer(projet_id, matricule, nom, type_, methode, saisi_par):
 
 
 def _presences_jour(projet_id, jour):
-    """Pivot par ouvrier : {matricule, nom, entree, sortie} pour un jour."""
+    """Pivot par ouvrier : {matricule, nom, fonction, entree, sortie} pour un jour."""
     evenements = (
         Presence.query.filter_by(projet_id=projet_id, jour=jour)
         .order_by(Presence.heure.desc())
@@ -80,12 +80,33 @@ def _presences_jour(projet_id, jour):
     for e in evenements:
         cle = (e.matricule, e.nom)
         d = par_ouvrier.setdefault(
-            cle, {"matricule": e.matricule, "nom": e.nom, "entree": None, "sortie": None, "methode": e.methode}
+            cle, {"matricule": e.matricule, "nom": e.nom, "fonction": "",
+                  "entree": None, "sortie": None, "methode": e.methode}
         )
         if e.type == "entree" and d["entree"] is None:
             d["entree"] = e.heure
         elif e.type == "sortie":
             d["sortie"] = e.heure
+
+    # Fonction de chaque ouvrier (dernier mois connu) : permet de filtrer par metier.
+    if par_ouvrier:
+        fonctions = {}
+        for mat, nom, fonction in (
+            db.session.query(Ouvrier.matricule_chantier, Ouvrier.nom, Ouvrier.fonction)
+            .filter(Ouvrier.projet_id == projet_id)
+            .order_by(Ouvrier.mois.asc())
+            .all()
+        ):
+            if fonction:
+                fonctions[(mat or "").strip()] = fonction
+                fonctions[(nom or "").strip().upper()] = fonction
+        for (mat, nom), d in par_ouvrier.items():
+            d["fonction"] = (
+                fonctions.get((mat or "").strip())
+                or fonctions.get((nom or "").strip().upper())
+                or ""
+            )
+
     return sorted(par_ouvrier.values(), key=lambda x: (x["nom"] or "").upper())
 
 
