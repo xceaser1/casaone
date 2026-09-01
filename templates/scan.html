@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Scanner — {{ societe }} {{ projet_nom }}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ statique('css/style.css') }}">
   {% include "_pwa.html" %}
   <style>
     :root { --scan-bg:#eef3f0; }
@@ -182,7 +182,7 @@
 </div>
 
 <canvas id="canvas" hidden></canvas>
-<script src="{{ url_for('static', filename='js/vendor/jsQR.js') }}"></script>
+<script src="{{ statique('js/vendor/jsQR.js') }}"></script>
 <script>
 (function () {
   var estMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)

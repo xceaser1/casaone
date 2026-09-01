@@ -66,6 +66,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
+    # En local, les gabarits sont relus a chaque requete : une modification de
+    # page est visible sans redemarrer le serveur. Desactive en production
+    # (gunicorn recharge de toute facon a chaque deploiement).
+    TEMPLATES_AUTO_RELOAD = not _PROD
+
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
     MAX_CONTENT_LENGTH = 32 * 1024 * 1024  # 32 Mo max pour l'import Excel
     ALLOWED_EXTENSIONS = {".xlsx", ".xlsm"}

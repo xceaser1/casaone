@@ -3,7 +3,7 @@ import os
 import socket
 
 import click
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, url_for
 from flask_login import LoginManager, current_user
 
 from config import Config
@@ -225,6 +225,19 @@ def _enregistrer_contexte(app):
         def peut(module, action="view"):
             return current_user.is_authenticated and current_user.peut(module, action)
 
+        def statique(fichier):
+            """URL d'un fichier statique avec empreinte de version.
+
+            Ajoute ?v=<date de modification> : des qu'on modifie le CSS ou le JS,
+            l'URL change et le navigateur recharge le fichier au lieu de servir
+            une version en cache (sinon il faut un Ctrl+F5 apres chaque deploiement).
+            """
+            try:
+                version = int(os.path.getmtime(os.path.join(app.static_folder, fichier)))
+            except OSError:
+                version = 0
+            return url_for("static", filename=fichier, v=version)
+
         projet_actif = None
         projets = []
         if current_user.is_authenticated:
@@ -235,6 +248,7 @@ def _enregistrer_contexte(app):
 
         return {
             "peut": peut,
+            "statique": statique,
             "projet_nom": projet_actif.nom if projet_actif else app.config["PROJET_NOM"],
             "societe": app.config["SOCIETE"],
             "projet_actif": projet_actif,
