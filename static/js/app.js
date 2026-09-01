@@ -81,6 +81,44 @@ function confirmerSuppression(texte) {
   return window.confirm(texte + '\n\nCette action est définitive.');
 }
 
+/* --------------------------------------- Tiroir de navigation (mobile)
+   La barre laterale coulisse depuis la gauche. Fermeture au clic sur le
+   voile, sur un lien, par Echap ou par un glissement vers la gauche. */
+(function () {
+  const voile = document.getElementById('voile-nav');
+  const sidebar = document.querySelector('.sidebar');
+  if (!voile || !sidebar) return;
+
+  const ouvrants = [document.getElementById('burger'), document.getElementById('onglet-menu')].filter(Boolean);
+
+  function ouvrir(oui) {
+    document.body.classList.toggle('nav-ouverte', oui);
+    voile.hidden = !oui;
+    // Empeche le defilement du contenu pendant que le tiroir est ouvert
+    document.body.style.overflow = oui ? 'hidden' : '';
+    ouvrants.forEach(b => b.setAttribute('aria-expanded', String(oui)));
+  }
+
+  ouvrants.forEach(b => b.addEventListener('click', e => {
+    e.preventDefault();
+    ouvrir(!document.body.classList.contains('nav-ouverte'));
+  }));
+  voile.addEventListener('click', () => ouvrir(false));
+  sidebar.addEventListener('click', e => { if (e.target.closest('a[href]')) ouvrir(false); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.body.classList.contains('nav-ouverte')) ouvrir(false);
+  });
+
+  /* Glissement vers la gauche pour refermer */
+  let xDepart = null;
+  sidebar.addEventListener('touchstart', e => { xDepart = e.touches[0].clientX; }, { passive: true });
+  sidebar.addEventListener('touchmove', e => {
+    if (xDepart === null) return;
+    if (xDepart - e.touches[0].clientX > 60) { ouvrir(false); xDepart = null; }
+  }, { passive: true });
+  sidebar.addEventListener('touchend', () => { xDepart = null; }, { passive: true });
+})();
+
 /* ------------------------------------------- Navigation : retour immediat
    Au clic sur un lien de la barre laterale, l'onglet devient actif tout de
    suite (sans attendre le chargement) et une barre de progression fine

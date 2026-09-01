@@ -499,14 +499,126 @@ input[type=range]::-moz-range-thumb {
 @media (max-width: 1180px) {
   .grille-2, .grille-3 { grid-template-columns: 1fr; }
 }
+/* Elements reserves au mobile : masques sur grand ecran. */
+.burger, .onglets-bas, .voile-nav { display: none; }
+
+/* =======================================================================
+   MOBILE — mise en page facon application native
+   - la barre laterale devient un tiroir coulissant (menu complet) ;
+   - les destinations principales passent dans une barre d'onglets basse,
+     accessible au pouce, avec un bouton de scan central mis en avant ;
+   - le contenu glisse horizontalement d'une rubrique a l'autre.
+   ===================================================================== */
 @media (max-width: 900px) {
-  :root { --sidebar: 62px; }
-  .marque, .nav a span, .nav-titre { display: none; }
-  .nav a { justify-content: center; padding: 10px; }
-  .sidebar-tete { justify-content: center; padding: 0; }
+  .appli { display: block; }
+
+  /* ---------------------------------------------- Tiroir de navigation */
+  .sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 70;
+    width: 280px; max-width: 84vw; flex: none; height: 100dvh;
+    transform: translateX(-100%);
+    transition: transform .28s cubic-bezier(.32,.72,0,1);
+    box-shadow: 0 0 40px rgba(0,0,0,.3);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body.nav-ouverte .sidebar { transform: none; }
+  .voile-nav {
+    display: block; position: fixed; inset: 0; z-index: 65;
+    background: rgba(15,23,42,.5); backdrop-filter: blur(2px);
+    opacity: 0; transition: opacity .28s ease;
+  }
+  body.nav-ouverte .voile-nav { opacity: 1; }
+  /* Le tiroir affiche le menu complet : libelles et titres restent visibles. */
+  .nav a { padding: 12px 14px; font-size: .92rem; }
+  .nav a.actif::after { display: none; }
+
+  /* ------------------------------------------------------- En-tete */
+  .topbar {
+    gap: 10px; padding: 0 14px;
+    padding-top: env(safe-area-inset-top);
+    height: calc(var(--topbar) + env(safe-area-inset-top));
+  }
+  .burger {
+    display: grid; place-items: center; flex: none;
+    width: 38px; height: 38px; border-radius: 11px;
+    border: 1px solid var(--bord); background: var(--blanc); color: var(--encre);
+    cursor: pointer; transition: background .15s ease;
+  }
+  .burger:active { background: var(--fond); }
+  .burger svg { width: 20px; height: 20px; }
+  .topbar .fil { min-width: 0; flex: 1; }
+  .topbar .fil h1 { font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .fil small { display: none; }          /* sous-titre : trop long sur mobile */
+  .compte-infos { display: none; }               /* identite : deja dans le tiroir */
+
+  /* ------------------------------------------------------- Contenu */
+  .zone { min-height: 100dvh; }
+  .contenu {
+    padding: 14px;
+    /* espace pour la barre d'onglets + encoche */
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  /* --------------------------------------------- Barre d'onglets basse */
+  .onglets-bas {
+    display: flex; align-items: stretch; justify-content: space-around;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    background: rgba(255,255,255,.92);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+            backdrop-filter: saturate(180%) blur(14px);
+    border-top: 1px solid var(--bord);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -4px 20px rgba(15,23,42,.06);
+  }
+  .onglets-bas a, .onglets-bas button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; padding: 9px 4px 7px; border: 0; background: none; cursor: pointer;
+    color: var(--doux); font: inherit; font-size: .66rem; font-weight: 600;
+    text-decoration: none; -webkit-tap-highlight-color: transparent;
+    transition: color .18s ease;
+  }
+  .onglets-bas svg { width: 21px; height: 21px; stroke-width: 1.9; transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
+  .onglets-bas a.actif { color: var(--vert-fonce); }
+  .onglets-bas a.actif svg { transform: translateY(-2px) scale(1.06); }
+  .onglets-bas a:active svg, .onglets-bas button:active svg { transform: scale(.9); }
+
+  /* Bouton central : action de terrain (scanner un badge) */
+  .onglets-bas .onglet-central {
+    flex: 0 0 auto; width: 54px; height: 54px; margin: -16px 4px 0;
+    border-radius: 50%; background: var(--grad-vert); color: #fff;
+    box-shadow: 0 8px 20px rgba(29,78,216,.42);
+    padding: 0; gap: 0;
+  }
+  .onglets-bas .onglet-central svg { width: 25px; height: 25px; stroke-width: 2.1; }
+
+  /* --------------------------------- Adaptations de contenu au mobile */
+  .grille-kpi { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi { padding: 13px; gap: 10px; flex-direction: column; }
+  .kpi-ic { width: 38px; height: 38px; border-radius: 11px; }
+  .kpi-ic svg { width: 19px; height: 19px; }
+  .kpi .val { font-size: 1.3rem; }
+  .kpi .note { font-size: .7rem; }
+  .carte-tete { padding: 13px 14px; }
+  .carte-corps { padding: 14px; }
+  .barre-outils, .filtres { padding: 12px 14px; }
+  .pres-filtres, .pres-liste { padding-left: 14px; padding-right: 14px; }
+  .modale { max-width: none; border-radius: var(--r-l) var(--r-l) 0 0; align-self: flex-end; max-height: 92dvh; }
+  .modale-fond { padding: 0; align-items: flex-end; }
+
+  /* Connexion : la colonne visuelle passe en pleine largeur */
   .page-login { grid-template-columns: 1fr; }
   .login-visuel { display: none; }
-  .contenu { padding: 14px; }
+
+  /* Transition laterale entre rubriques (sensation d'application native) */
+  ::view-transition-old(contenu) { animation: glisse-sortie .18s ease both; }
+  ::view-transition-new(contenu) { animation: glisse-entree .28s cubic-bezier(.32,.72,0,1) both; }
+  @keyframes glisse-entree { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+  @keyframes glisse-sortie { from { opacity: 1; } to { opacity: 0; transform: translateX(-10px); } }
+}
+
+/* Ecrans tres etroits : les KPI passent sur une colonne */
+@media (max-width: 420px) {
+  .grille-kpi { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
