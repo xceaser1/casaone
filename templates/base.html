@@ -35,7 +35,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block titre %}{{ projet_nom }}{% endblock %} — {{ societe }}</title>
   <link rel="stylesheet" href="{{ statique('css/style.css') }}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2314603c'/><text x='16' y='22' font-size='15' font-family='sans-serif' fill='white' text-anchor='middle'>U</text></svg>">
@@ -148,6 +148,11 @@
 
   <div class="zone">
     <header class="topbar">
+      <button class="burger" id="burger" aria-label="Ouvrir le menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M3 6h18M3 12h18M3 18h18"/>
+        </svg>
+      </button>
       <div class="fil">
         <h1>{% block entete %}{{ self.titre() }}{% endblock %}</h1>
         <small>{% block sous_entete %}{% endblock %}</small>
@@ -172,6 +177,37 @@
     </main>
   </div>
 </div>
+
+{# ----------------------------------------------- Navigation mobile ----- #}
+{# Voile affiche derriere le tiroir de navigation (mobile uniquement). #}
+<div class="voile-nav" id="voile-nav" hidden></div>
+
+{# Barre d'onglets inferieure : destinations principales, a portee du pouce. #}
+<nav class="onglets-bas" aria-label="Navigation principale">
+  {% if peut('dashboard') %}
+  <a href="{{ url_for('pages.dashboard') }}" class="{{ 'actif' if page == 'dashboard' }}">
+    {{ ico('dashboard') }}<span>Tableau</span>
+  </a>
+  {% endif %}
+  {% if peut('surfaces') %}
+  <a href="{{ url_for('pages.plan_interactif') }}" class="{{ 'actif' if page == 'plan' }}">
+    {{ ico('plan') }}<span>Plan</span>
+  </a>
+  {% endif %}
+  {% if peut('pointage') %}
+  <a href="{{ url_for('pointage.scan') }}" class="onglet-central" aria-label="Scanner un badge">
+    {{ ico('scan') }}
+  </a>
+  <a href="{{ url_for('pointage.presences') }}" class="{{ 'actif' if page == 'presences' }}">
+    {{ ico('presence') }}<span>Présences</span>
+  </a>
+  {% endif %}
+  <button type="button" id="onglet-menu" aria-label="Ouvrir le menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 6h18M3 12h18M3 18h18"/>
+    </svg><span>Menu</span>
+  </button>
+</nav>
 
 <div class="notifs" id="notifs"></div>
 <script src="{{ statique('js/vendor/chart.min.js') }}"></script>

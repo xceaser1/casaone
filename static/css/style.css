@@ -499,14 +499,192 @@ input[type=range]::-moz-range-thumb {
 @media (max-width: 1180px) {
   .grille-2, .grille-3 { grid-template-columns: 1fr; }
 }
+/* Elements reserves au mobile : masques sur grand ecran. */
+.burger, .onglets-bas, .voile-nav { display: none; }
+
+/* =======================================================================
+   MOBILE — mise en page facon application native
+   - la barre laterale devient un tiroir coulissant (menu complet) ;
+   - les destinations principales passent dans une barre d'onglets basse,
+     accessible au pouce, avec un bouton de scan central mis en avant ;
+   - le contenu glisse horizontalement d'une rubrique a l'autre.
+   ===================================================================== */
 @media (max-width: 900px) {
-  :root { --sidebar: 62px; }
-  .marque, .nav a span, .nav-titre { display: none; }
-  .nav a { justify-content: center; padding: 10px; }
-  .sidebar-tete { justify-content: center; padding: 0; }
+  .appli { display: block; }
+
+  /* ---------------------------------------------- Tiroir de navigation */
+  .sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 70;
+    width: 280px; max-width: 84vw; flex: none; height: 100dvh;
+    transform: translateX(-100%);
+    transition: transform .28s cubic-bezier(.32,.72,0,1);
+    box-shadow: 0 0 40px rgba(0,0,0,.3);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body.nav-ouverte .sidebar { transform: none; }
+  .voile-nav {
+    display: block; position: fixed; inset: 0; z-index: 65;
+    background: rgba(15,23,42,.5); backdrop-filter: blur(2px);
+    opacity: 0; transition: opacity .28s ease;
+  }
+  body.nav-ouverte .voile-nav { opacity: 1; }
+  /* Le tiroir affiche le menu complet : libelles et titres restent visibles. */
+  .nav a { padding: 12px 14px; font-size: .92rem; }
+  .nav a.actif::after { display: none; }
+
+  /* ------------------------------------------------------- En-tete */
+  .topbar {
+    gap: 10px; padding: 0 14px;
+    padding-top: env(safe-area-inset-top);
+    height: calc(var(--topbar) + env(safe-area-inset-top));
+  }
+  .burger {
+    display: grid; place-items: center; flex: none;
+    width: 38px; height: 38px; border-radius: 11px;
+    border: 1px solid var(--bord); background: var(--blanc); color: var(--encre);
+    cursor: pointer; transition: background .15s ease;
+  }
+  .burger:active { background: var(--fond); }
+  .burger svg { width: 20px; height: 20px; }
+  .topbar .fil { min-width: 0; flex: 1; }
+  .topbar .fil h1 { font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .fil small { display: none; }          /* sous-titre : trop long sur mobile */
+  .compte-infos { display: none; }               /* identite : deja dans le tiroir */
+
+  /* ------------------------------------------------------- Contenu */
+  .zone { min-height: 100dvh; }
+  .contenu {
+    padding: 14px;
+    /* espace pour la barre d'onglets + encoche */
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  /* --------------------------------------------- Barre d'onglets basse */
+  /* Barre flottante de boutons ronds (inspiree des applications iOS) */
+  .onglets-bas {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 60; padding: 9px 12px; border-radius: 40px;
+    background: rgba(255,255,255,.72);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+            backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: 0 10px 30px rgba(30,41,59,.14), inset 0 0 0 1px rgba(255,255,255,.6);
+  }
+  .onglets-bas a, .onglets-bas button {
+    display: grid; place-items: center; width: 46px; height: 46px;
+    border: 0; border-radius: 50%; cursor: pointer; padding: 0;
+    background: rgba(255,255,255,.55); color: var(--doux);
+    -webkit-tap-highlight-color: transparent;
+    transition: background .2s ease, color .2s ease, transform .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .onglets-bas span { display: none; }        /* icones seules, comme le modele */
+  .onglets-bas svg { width: 21px; height: 21px; stroke-width: 1.85; }
+  .onglets-bas a.actif {
+    background: #fff; color: var(--vert-fonce);
+    box-shadow: 0 4px 12px rgba(30,41,59,.14);
+    transform: translateY(-2px);
+  }
+  .onglets-bas a:active, .onglets-bas button:active { transform: scale(.92); }
+
+  /* Bouton central : action de terrain (scanner un badge) */
+  .onglets-bas .onglet-central {
+    width: 56px; height: 56px; margin: 0 2px;
+    background: var(--grad-vert); color: #fff;
+    box-shadow: 0 8px 22px rgba(29,78,216,.45);
+  }
+  .onglets-bas .onglet-central svg { width: 25px; height: 25px; stroke-width: 2.1; }
+  .onglets-bas .onglet-central:active { transform: scale(.94); }
+
+  /* ============================================================
+     Style mobile : fond pastel, feuilles blanches arrondies,
+     grande typographie aeree et boutons circulaires.
+     ============================================================ */
+  body, .zone {
+    background:
+      linear-gradient(168deg, #d9f2ec 0%, #e4eefb 42%, #ebe9fb 72%, #f6f0fa 100%)
+      fixed;
+  }
+  .topbar {
+    background: transparent; border-bottom: 0; box-shadow: none;
+    position: static;
+  }
+  .topbar .fil h1 { font-size: 1.15rem; letter-spacing: -.02em; }
+  /* Boutons ronds facon "pilule" : menu, avatar, deconnexion */
+  .burger, .topbar .compte .btn.mini {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(255,255,255,.9); border: 0;
+    box-shadow: 0 4px 14px rgba(30,41,59,.08);
+  }
+  .avatar {
+    width: 42px; height: 42px; box-shadow: 0 4px 14px rgba(30,41,59,.1);
+    background: rgba(255,255,255,.9); color: var(--vert-fonce);
+  }
+
+  /* Cartes : feuilles blanches largement arrondies, sans bordure */
+  .carte, .kpi {
+    border: 0; border-radius: 24px;
+    background: rgba(255,255,255,.86);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    box-shadow: 0 6px 22px rgba(30,41,59,.07);
+  }
+  .carte-tete { padding: 16px 18px 10px; border-bottom: 0; }
+  .carte-corps { padding: 6px 18px 18px; }
+  .barre-outils, .filtres { padding: 12px 16px; border-bottom: 0; background: transparent; }
+
+  /* --------------------------------------- KPI : le premier en heros */
+  .grille-kpi { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .kpi { padding: 16px; gap: 10px; flex-direction: column; align-items: flex-start; }
+  .kpi-ic {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(255,255,255,.75) !important; color: var(--vert-fonce);
+    box-shadow: inset 0 0 0 1px rgba(30,41,59,.06);
+  }
+  .kpi-ic svg { width: 20px; height: 20px; }
+  .kpi .lib { font-size: .68rem; letter-spacing: .06em; }
+  .kpi .val { font-size: 1.45rem; font-weight: 700; letter-spacing: -.03em; }
+  .kpi .note { font-size: .69rem; line-height: 1.35; }
+
+  /* Le KPI principal occupe toute la largeur : grand chiffre aere */
+  .kpi.accent {
+    grid-column: 1 / -1; background: transparent; box-shadow: none;
+    padding: 6px 4px 14px; align-items: flex-start;
+  }
+  .kpi.accent .lib { color: var(--doux); }
+  .kpi.accent .val {
+    font-size: 3.4rem; font-weight: 300; color: var(--encre);
+    letter-spacing: -.04em; line-height: 1;
+  }
+  .kpi.accent .val small { font-size: 1rem; color: var(--doux); }
+  .kpi.accent .note { color: var(--doux); font-size: .8rem; margin-top: 8px; }
+  .kpi.accent .kpi-ic { display: none; }
+  .kpi.accent .jauge { background: rgba(255,255,255,.7); height: 7px; }
+  .kpi.accent .jauge i { background: var(--grad-vert); }
+
+  /* Listes et pastilles : coins tres arrondis */
+  .pres-filtres, .pres-liste { padding-left: 16px; padding-right: 16px; }
+  .pres-c { border: 0; border-radius: 18px; background: rgba(255,255,255,.7); }
+  .pres-av { border-radius: 50%; }
+  .tuile { border-radius: 22px; border: 0; }
+
+  /* Feuille modale ancree en bas */
+  .modale { max-width: none; border-radius: 26px 26px 0 0; align-self: flex-end; max-height: 92dvh; }
+  .modale-fond { padding: 0; align-items: flex-end; }
+
+  /* Connexion : la colonne visuelle passe en pleine largeur */
   .page-login { grid-template-columns: 1fr; }
   .login-visuel { display: none; }
-  .contenu { padding: 14px; }
+
+  /* Transition laterale entre rubriques (sensation d'application native) */
+  ::view-transition-old(contenu) { animation: glisse-sortie .18s ease both; }
+  ::view-transition-new(contenu) { animation: glisse-entree .28s cubic-bezier(.32,.72,0,1) both; }
+  @keyframes glisse-entree { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+  @keyframes glisse-sortie { from { opacity: 1; } to { opacity: 0; transform: translateX(-10px); } }
+}
+
+/* Ecrans tres etroits : les KPI passent sur une colonne */
+@media (max-width: 420px) {
+  .grille-kpi { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
