@@ -522,12 +522,19 @@ input[type=range]::-moz-range-thumb {
     padding-bottom: env(safe-area-inset-bottom);
   }
   body.nav-ouverte .sidebar { transform: none; }
+  /* Voile du tiroir. Il ne doit exister dans la page que lorsque le menu est
+     ouvert : sinon il recouvre tout l'ecran (invisible) et intercepte les
+     appuis, rendant les boutons inutilisables. On respecte donc l'attribut
+     [hidden] pose par le script, et on neutralise les evenements par securite. */
+  .voile-nav[hidden] { display: none; }
   .voile-nav {
-    display: block; position: fixed; inset: 0; z-index: 65;
+    position: fixed; inset: 0; z-index: 65;
     background: rgba(15,23,42,.5); backdrop-filter: blur(2px);
     opacity: 0; transition: opacity .28s ease;
+    pointer-events: none;
   }
-  body.nav-ouverte .voile-nav { opacity: 1; }
+  .voile-nav:not([hidden]) { display: block; }
+  body.nav-ouverte .voile-nav { opacity: 1; pointer-events: auto; }
   /* Le tiroir affiche le menu complet : libelles et titres restent visibles. */
   .nav a { padding: 12px 14px; font-size: .92rem; }
   .nav a.actif::after { display: none; }
