@@ -92,8 +92,18 @@ function confirmerSuppression(texte) {
   const ouvrants = [document.getElementById('burger'), document.getElementById('onglet-menu')].filter(Boolean);
 
   function ouvrir(oui) {
-    document.body.classList.toggle('nav-ouverte', oui);
-    voile.hidden = !oui;
+    if (oui) {
+      // On insere le voile AVANT d'animer, sinon la transition d'opacite
+      // ne demarre pas (l'element vient d'apparaitre dans la mise en page).
+      voile.hidden = false;
+      requestAnimationFrame(() => document.body.classList.add('nav-ouverte'));
+    } else {
+      document.body.classList.remove('nav-ouverte');
+      // On retire le voile a la fin du fondu pour qu'il ne bloque plus les appuis.
+      setTimeout(() => {
+        if (!document.body.classList.contains('nav-ouverte')) voile.hidden = true;
+      }, 280);
+    }
     // Empeche le defilement du contenu pendant que le tiroir est ouvert
     document.body.style.overflow = oui ? 'hidden' : '';
     ouvrants.forEach(b => b.setAttribute('aria-expanded', String(oui)));
