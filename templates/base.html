@@ -210,7 +210,9 @@
 </nav>
 
 <div class="notifs" id="notifs"></div>
-<script src="{{ statique('js/vendor/chart.min.js') }}"></script>
+{# Librairie de graphiques : chargee uniquement par les pages qui en
+   ont besoin (205 Ko). Une page l'active avec {% block graphiques %}. #}
+{% block graphiques %}{% endblock %}
 <script src="{{ statique('js/app.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
