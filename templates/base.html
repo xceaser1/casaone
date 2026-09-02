@@ -104,6 +104,14 @@
       {% endif %}
       {% if peut('validation') %}{{ lien(url_for('pages.validation'), 'validation', page, 'Validation des plans', 'validation') }}{% endif %}
 
+      {% if peut('stock') %}
+      <div class="nav-titre">Stock</div>
+      {{ lien(url_for('stock.index'), 'stock', page, 'État du stock', 'dalles') }}
+      <div class="sous-nav">
+        {{ lien(url_for('stock.mouvements'), 'stock-mouvements', page, 'Journal des mouvements') }}
+      </div>
+      {% endif %}
+
       {% if peut('dalles') %}
       <div class="nav-titre">Dalles</div>
       {{ lien(url_for('pages.dalles'), 'dalles', page, 'Tous les types', 'dalles') }}

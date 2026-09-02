@@ -14,6 +14,7 @@ from models import livraison as _livraison_models  # noqa: F401  (enregistre la 
 from models import engin as _engin_models  # noqa: F401  (enregistre la table engins)
 from models import metier as _metier_models  # noqa: F401
 from models import presence as _presence_models  # noqa: F401  (enregistre la table presences)
+from models import stock as _stock_models  # noqa: F401  (depots, articles, mouvements)
 from models.projet import Projet
 
 login_manager = LoginManager()
@@ -47,6 +48,7 @@ def creer_app(config_class=Config):
     from routes.page_routes import bp as pages_bp
     from routes.pointage_routes import bp as pointage_bp
     from routes.projet_routes import bp as projets_bp
+    from routes.stock_routes import bp as stock_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(pages_bp)
@@ -54,6 +56,7 @@ def creer_app(config_class=Config):
     app.register_blueprint(admin_bp)
     app.register_blueprint(projets_bp)
     app.register_blueprint(pointage_bp)
+    app.register_blueprint(stock_bp)
 
     _enregistrer_contexte(app)
     _enregistrer_erreurs(app)

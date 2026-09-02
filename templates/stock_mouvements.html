@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block titre %}Journal du stock{% endblock %}
+{% block sous_entete %}Entrées, sorties et transferts{% endblock %}
+
+{% block contenu %}
+<div class="presences-barre">
+  <p class="badges-info">Historique des écritures. Chaque ligne justifie une quantité en stock.</p>
+  <div class="presences-actions">
+    <a class="btn" href="{{ url_for('stock.index') }}">← État du stock</a>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="carte-tete">
+    <h3>Mouvements</h3>
+    <span class="pres-compte">{{ lignes|length }} écriture{{ 's' if lignes|length > 1 }}</span>
+  </div>
+
+  <form class="pres-filtres" method="get">
+    <select name="type" onchange="this.form.submit()">
+      <option value="">Tous les types</option>
+      {% for code, libelle in types %}
+      <option value="{{ code }}" {{ 'selected' if args.get('type') == code }}>{{ libelle }}</option>
+      {% endfor %}
+    </select>
+    <select name="depot" onchange="this.form.submit()">
+      <option value="">Tous les dépôts</option>
+      {% for d in filtres.depots %}
+      <option value="{{ d.id }}" {{ 'selected' if args.get('depot') == d.id|string }}>{{ d.code }} — {{ d.nom }}</option>
+      {% endfor %}
+    </select>
+    <select name="article" onchange="this.form.submit()">
+      <option value="">Tous les articles</option>
+      {% for a in filtres.articles %}
+      <option value="{{ a.id }}" {{ 'selected' if args.get('article') == a.id|string }}>{{ a.designation }}</option>
+      {% endfor %}
+    </select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--doux)">
+      du <input type="date" name="du" value="{{ args.get('du','') }}" onchange="this.form.submit()">
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--doux)">
+      au <input type="date" name="au" value="{{ args.get('au','') }}" onchange="this.form.submit()">
+    </label>
+    <a class="btn mini" href="{{ url_for('stock.mouvements') }}">Réinitialiser</a>
+  </form>
+
+  <div class="pres-liste">
+    {% for m in lignes %}
+    <div class="pres-c">
+      <span class="pres-av {{ 'sortie' if m.type == 'sortie' }}"
+            {% if m.type == 'transfert' %}style="background:#dbe7fe;color:#1d4ed8"{% endif %}>
+        {% if m.type == 'entree' %}↓{% elif m.type == 'sortie' %}↑{% else %}⇄{% endif %}
+      </span>
+      <div class="pres-info">
+        <b>{{ m.article.designation if m.article else '—' }}</b>
+        <small>
+          {% if m.type == 'transfert' %}
+            {{ m.source.code if m.source }} → {{ m.destination.code if m.destination }}
+          {% elif m.type == 'entree' %}
+            vers {{ m.destination.code if m.destination }}
+          {% else %}
+            depuis {{ m.source.code if m.source }}
+          {% endif %}
+          {% if m.reference %} · {{ m.reference }}{% endif %}
+          {% if m.saisi_par %} · {{ m.saisi_par }}{% endif %}
+        </small>
+      </div>
+      <div class="pres-tps">
+        <span class="badge-statut {{ 'b-vert' if m.type == 'entree' else ('b-gris' if m.type == 'sortie' else 'b-bleu') }}">
+          {{ m.type_libelle }}
+        </span>
+        <span class="pres-h">
+          <b>{{ '%g'|format(m.quantite) }} {{ m.article.unite if m.article }}</b>
+          <b style="color:var(--doux);font-weight:500">{{ m.date_mouvement.strftime('%d/%m') }}</b>
+        </span>
+      </div>
+      {% if peut('stock', 'delete') %}
+      <form method="post" action="{{ url_for('stock.supprimer_mouvement', mid=m.id) }}"
+            onsubmit="return confirmerSuppression('Supprimer ce mouvement ?')" style="margin:0">
+        <button class="btn mini btn-danger" type="submit">✕</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% if not lignes %}
+    <div class="pres-vide">Aucun mouvement pour ces critères.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
