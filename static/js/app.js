@@ -157,6 +157,41 @@ function confirmerSuppression(texte) {
   });
 })();
 
+/* ------------------------------------ Sidebar : sections repliables
+   Chaque groupe de la barre laterale est un <details> : il fonctionne donc
+   sans JavaScript. Le script ajoute deux choses : la memorisation de l'etat
+   ouvert/ferme d'une page a l'autre, et le reperage de la section qui
+   contient la page courante. */
+(function () {
+  const sections = document.querySelectorAll('.nav .nav-sect');
+  if (!sections.length) return;
+
+  const CLE = 'casaone.nav.sections';
+  const lire = () => {
+    try { return JSON.parse(localStorage.getItem(CLE)) || {}; } catch (e) { return {}; }
+  };
+  const ecrire = (etat) => {
+    try { localStorage.setItem(CLE, JSON.stringify(etat)); } catch (e) { /* mode prive */ }
+  };
+
+  const etat = lire();
+  sections.forEach(sect => {
+    const id = sect.dataset.sect;
+    const porteActif = !!sect.querySelector('a.actif');
+    if (porteActif) sect.classList.add('contient-actif');
+
+    // Un choix explicite de l'utilisateur prime. A defaut on garde l'etat rendu
+    // par le serveur, qui deplie deja la section de la page courante.
+    if (id in etat) sect.open = etat[id];
+
+    sect.addEventListener('toggle', () => {
+      const courant = lire();
+      courant[id] = sect.open;
+      ecrire(courant);
+    });
+  });
+})();
+
 /* ------------------------------------------------------------ Graphiques */
 if (window.Chart) {
   Chart.defaults.font.family = CSS.getPropertyValue('--police') || 'sans-serif';
