@@ -304,9 +304,25 @@ def _enregistrer_contexte(app):
                 choisi = session.get("projet_id")
                 projet_actif = next((p for p in projets if p.id == choisi), None) or projets[0]
 
+        def presents_aujourdhui():
+            """Nombre d'ouvriers pointes en entree ce jour, pour la pastille du menu.
+
+            Simple COUNT sur un index existant (projet + jour) : appele une fois
+            par rendu de page, le cout est negligeable. Renvoie 0 des que
+            l'utilisateur n'a pas acces au pointage.
+            """
+            if projet_actif is None or not peut("pointage"):
+                return 0
+            from datetime import date
+            from models.presence import Presence
+            return Presence.query.filter_by(
+                projet_id=projet_actif.id, jour=date.today(), type="entree"
+            ).count()
+
         return {
             "peut": peut,
             "statique": statique,
+            "presents_aujourdhui": presents_aujourdhui,
             "projet_nom": projet_actif.nom if projet_actif else app.config["PROJET_NOM"],
             "societe": app.config["SOCIETE"],
             "projet_actif": projet_actif,

@@ -899,7 +899,7 @@ input[type=range]::-moz-range-thumb {
 }
 .nav-sect > summary::-webkit-details-marker { display: none; }
 .nav-sect > summary::marker { content: ""; }
-.nav-sect > summary > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-sect > summary > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-sect > summary:hover { color: rgba(255,255,255,.88); background: rgba(255,255,255,.06); }
 .nav-sect[open] > summary { color: rgba(255,255,255,.74); }
 .nav-sect > summary .chev {
@@ -957,3 +957,219 @@ input[type=range]::-moz-range-thumb {
 body.hors-ligne .btn-primaire,
 body.hors-ligne .btn-danger,
 body.hors-ligne form button[type="submit"] { opacity: .45; pointer-events: none; }
+
+/* =========================================================================
+   THEME VERRE — panneaux flottants translucides sur fond degrade
+   Les zones de donnees restent volontairement peu transparentes : un tableau
+   de 192 lignes doit rester lisible, la transparence sert le cadre, pas le
+   contenu.
+   ========================================================================= */
+:root {
+  --grad-app:
+    radial-gradient(1100px 760px at 6% -8%, #2563eb 0%, transparent 55%),
+    radial-gradient(820px 620px at 98% 4%, #0ea5b7 0%, transparent 48%),
+    radial-gradient(700px 700px at 60% 105%, #1e3a8a 0%, transparent 55%),
+    linear-gradient(155deg, #0d1734 0%, #142457 48%, #0a1129 100%);
+  --marge-verre: 14px;
+  --r-verre: 22px;
+}
+
+html, body { background: #0d1734; }
+
+/* Le degrade est un calque fixe de la taille de l'ecran, pas le fond d'un
+   element haut de plusieurs milliers de pixels : une seule couche a composer,
+   qui ne bouge jamais au defilement. */
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: -1;
+  background: var(--grad-app);
+}
+.appli { min-height: 100vh; background: transparent; }
+@media (min-width: 901px) {
+  .appli { padding: var(--marge-verre); gap: var(--marge-verre); }
+}
+
+/* ------------------------------------------------- Panneau lateral */
+@media (min-width: 901px) {
+  .sidebar {
+    height: calc(100vh - var(--marge-verre) * 2);
+    top: var(--marge-verre);
+    border-radius: var(--r-verre);
+    background: linear-gradient(178deg, rgba(255,255,255,.16) 0%, rgba(10,18,44,.42) 42%, rgba(6,12,32,.58) 100%);
+    backdrop-filter: blur(26px) saturate(150%);
+    -webkit-backdrop-filter: blur(26px) saturate(150%);
+    border: 1px solid rgba(255,255,255,.16);
+    box-shadow: 0 24px 60px rgba(4,10,28,.45), inset 0 1px 0 rgba(255,255,255,.22);
+    overflow: hidden;
+  }
+}
+
+/* Sur telephone le tiroir glisse au-dessus d'un contenu clair : un fond
+   translucide y deviendrait gris pale et le texte blanc illisible. Il garde
+   donc un fond opaque, independant de ce qui se trouve derriere. */
+@media (max-width: 900px) {
+  .sidebar {
+    background: linear-gradient(185deg, #151f42 0%, #1d2850 100%);
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    border: 0; border-radius: 0 var(--r-verre) var(--r-verre) 0;
+    box-shadow: 0 0 44px rgba(4,10,28,.5);
+  }
+}
+
+/* Marque : nom complet, ou initiale seule en mode rail */
+.sidebar-marque {
+  display: flex; align-items: center; gap: 8px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.marque-nom {
+  flex: 1; min-width: 0;
+  font-size: 1.12rem; font-weight: 800; letter-spacing: .01em; color: #fff;
+  white-space: nowrap; overflow: hidden;
+}
+.marque-court { display: none; font-size: 1.2rem; font-weight: 800; color: #fff; }
+.rail-bascule {
+  width: 28px; height: 28px; flex: 0 0 28px;
+  border-radius: 9px; border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.8);
+  display: grid; place-items: center; cursor: pointer;
+  transition: background .15s ease, color .15s ease, transform .25s ease;
+}
+.rail-bascule:hover { background: rgba(255,255,255,.18); color: #fff; }
+.rail-bascule svg { width: 15px; height: 15px; }
+/* Le rail n'a pas de sens dans un tiroir mobile : on masque sa commande.
+   Cette regle doit suivre celle ci-dessus, sinon la cascade l'annule. */
+@media (max-width: 900px) { .rail-bascule { display: none; } }
+
+.sidebar-tete { border-bottom: 1px solid rgba(255,255,255,.12); height: auto; }
+
+.nav-intitule {
+  padding: 14px 18px 2px;
+  font-size: .62rem; letter-spacing: .16em; text-transform: uppercase;
+  color: rgba(255,255,255,.42); font-weight: 700;
+}
+
+/* Groupes separes par des filets, comme le modele */
+.nav-sect + .nav-sect,
+.nav > a + .nav-sect { border-top: 1px solid rgba(255,255,255,.09); }
+.nav > a + .nav-sect { margin-top: 8px; padding-top: 8px; }
+.nav-sect { margin: 0; padding: 4px 0; }
+
+.nav-badge {
+  flex: 0 0 auto;
+  min-width: 19px; height: 19px; padding: 0 6px;
+  border-radius: 99px; background: var(--vert); color: #fff;
+  display: grid; place-items: center;
+  font-size: .68rem; font-weight: 700; letter-spacing: 0;
+  box-shadow: 0 2px 8px rgba(59,130,246,.5);
+}
+
+.sidebar-pied {
+  margin-top: auto;
+  border-top: 1px solid rgba(255,255,255,.12);
+  padding: 8px 10px;
+}
+.sidebar-pied a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; border-radius: var(--r-s);
+  color: rgba(255,255,255,.78); font-size: .875rem; font-weight: 500;
+}
+.sidebar-pied a:hover { background: rgba(255,255,255,.10); color: #fff; }
+.sidebar-pied svg { width: 17px; height: 17px; flex: 0 0 17px; }
+
+/* -------------------------------------------------- Zone de contenu */
+.zone {
+  background: rgba(255,255,255,.86);
+  border: 1px solid rgba(255,255,255,.35);
+}
+@media (min-width: 901px) {
+  .zone {
+    border-radius: var(--r-verre);
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(4,10,28,.35);
+  }
+}
+.topbar {
+  background: rgba(255,255,255,.42);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255,255,255,.5);
+}
+/* Les cartes portent les donnees : assez opaques pour rester nettes. */
+/* Pas de backdrop-filter ici : une page de tableau peut porter des dizaines de
+   cartes, et autant de couches a flouter penaliseraient le defilement sur
+   telephone. La translucidite seule suffit a l'effet. */
+.carte {
+  background: rgba(255,255,255,.78);
+  border-color: rgba(255,255,255,.6);
+  box-shadow: 0 2px 6px rgba(13,23,52,.05), 0 14px 34px rgba(13,23,52,.07);
+}
+
+/* ------------------------------------------- Mode rail : icones seules */
+/* Le panneau se reduit a ses icones. Les sections restent depliees : en mode
+   rail, replier n'aurait plus de sens puisque les intitules sont masques. */
+@media (min-width: 901px) {
+  body.rail { --sidebar: 76px; }
+  body.rail .marque-nom { display: none; }
+  body.rail .marque-court { display: block; flex: 1; text-align: center; }
+  body.rail .sidebar-marque { padding: 16px 10px 12px; flex-direction: column; gap: 10px; }
+  body.rail .rail-bascule { transform: rotate(180deg); }
+
+  /* Selecteur de projet : la pastille seule, centree */
+  body.rail .projet-switch > summary { justify-content: center; padding: 12px 0; }
+  body.rail .marque, body.rail .projet-switch .chevron { display: none; }
+  body.rail .projet-menu { position: absolute; left: 72px; top: 8px; width: 250px; z-index: 80; }
+
+  body.rail .nav-intitule { text-align: center; padding: 12px 0 2px; letter-spacing: .1em; }
+
+  /* Les intitules de section disparaissent, le filet marque la separation */
+  body.rail .nav-sect > summary { display: none; }
+  body.rail .nav-sect[open] > .nav-sect-corps,
+  body.rail .nav-sect > .nav-sect-corps {
+    display: block; margin: 0; padding: 0; border-left: 0;
+  }
+  body.rail .nav-sect { border-top: 1px solid rgba(255,255,255,.09); padding: 6px 0; }
+
+  body.rail .nav { padding: 6px 8px 16px; }
+  body.rail .nav a,
+  body.rail .sidebar-pied a {
+    justify-content: center; gap: 0; padding: 11px 0; position: relative;
+  }
+  body.rail .nav a span,
+  body.rail .sidebar-pied a span { display: none; }
+  body.rail .nav .sous-nav a { padding-left: 0; }
+  body.rail .nav a.actif::after { display: none; }
+
+  /* Un sous-lien n'a pas d'icone propre. Plutot que de le masquer (la page
+     deviendrait inaccessible en mode rail), on affiche ses initiales dans une
+     pastille discrete : l'infobulle donne le libelle complet au survol. */
+  body.rail .nav .sous-nav a::before {
+    content: attr(data-initiale);
+    width: 22px; height: 22px; border-radius: 7px;
+    display: grid; place-items: center;
+    background: rgba(255,255,255,.10);
+    border: 1px solid rgba(255,255,255,.14);
+    font-size: .6rem; font-weight: 700; letter-spacing: .02em; opacity: .8;
+  }
+  body.rail .nav .sous-nav a:hover::before { background: rgba(255,255,255,.2); opacity: 1; }
+
+  /* Pastille reportee en coin puisqu'il n'y a plus d'intitule */
+  body.rail .nav-badge { display: none; }
+  body.rail .nav-sect.a-badge { position: relative; }
+  body.rail .nav-sect.a-badge::after {
+    content: ""; position: absolute; top: 8px; right: 14px;
+    width: 8px; height: 8px; border-radius: 99px; background: var(--vert);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.28);
+  }
+
+  /* Infobulle au survol : le libelle reste accessible sans deplier */
+  body.rail .nav a[data-libelle]:hover::after,
+  body.rail .sidebar-pied a[data-libelle]:hover::after {
+    content: attr(data-libelle);
+    position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%);
+    background: rgba(10,18,44,.96); color: #fff;
+    padding: 6px 10px; border-radius: 8px; font-size: .78rem; font-weight: 500;
+    white-space: nowrap; pointer-events: none; z-index: 90;
+    box-shadow: 0 8px 22px rgba(4,10,28,.4);
+  }
+}

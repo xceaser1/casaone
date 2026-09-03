@@ -26,15 +26,17 @@
 {% endmacro %}
 
 {% macro lien(cible, page_id, courant, libelle, icone=None, sous=False) %}
-<a href="{{ cible }}" class="{{ 'actif' if courant == page_id }}">
+<a href="{{ cible }}" class="{{ 'actif' if courant == page_id }}" data-libelle="{{ libelle }}"
+   {% if not icone %}data-initiale="{{ libelle[:2]|upper }}"{% endif %}>
   {% if icone %}{{ ico(icone) }}{% endif %}<span>{{ libelle }}</span>
 </a>
 {% endmacro %}
 
-{% macro section(titre, id, pages) %}
+{% macro section(titre, id, pages, badge=0) %}
 <details class="nav-sect" data-sect="{{ id }}" {{ 'open' if page in pages }}>
   <summary>
     <span>{{ titre }}</span>
+    {% if badge %}<span class="nav-badge" title="{{ badge }} present(s) aujourd'hui">{{ badge }}</span>{% endif %}
     <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
   </summary>
@@ -53,8 +55,24 @@
   {% include "_pwa.html" %}
 </head>
 <body>
+<script>
+  try {
+    if (localStorage.getItem('casaone.nav.rail') === '1') document.body.classList.add('rail');
+  } catch (e) { /* stockage indisponible : menu deplie par defaut */ }
+</script>
 <div class="appli">
   <aside class="sidebar">
+    <div class="sidebar-marque">
+      <span class="marque-nom">CASA ONE</span>
+      <span class="marque-court" aria-hidden="true">C</span>
+      <button class="rail-bascule" id="rail-bascule" type="button"
+              aria-label="Reduire le menu" title="Reduire le menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 6l-6 6 6 6"/>
+        </svg>
+      </button>
+    </div>
     <div class="sidebar-tete">
       <details class="projet-switch" id="projet-switch">
         <summary title="Changer de projet">
@@ -93,6 +111,7 @@
         </div>
       </details>
     </div>
+    <div class="nav-intitule">Menu</div>
     <nav class="nav">
       {# Acces directs : toujours visibles, hors sections #}
       {% if peut('projets') %}{{ lien(url_for('projets.index'), 'projets', page, 'Projets', 'projets') }}{% endif %}
@@ -163,7 +182,7 @@
       {% endif %}
 
       {% if peut('pointage') %}
-      {% call section('Pointage', 'pointage', ['presences','scan','badges']) %}
+      {% call section('Pointage', 'pointage', ['presences','scan','badges'], presents_aujourdhui()) %}
         {{ lien(url_for('pointage.presences'), 'presences', page, 'Présences du jour', 'presence') }}
         {{ lien(url_for('pointage.scan'), 'scan', page, 'Scanner (mobile)', 'scan') }}
         {{ lien(url_for('pointage.liste_badges'), 'badges', page, 'Badges QR', 'qr') }}
@@ -176,6 +195,16 @@
       {% endcall %}
       {% endif %}
     </nav>
+
+    <div class="sidebar-pied">
+      <a href="{{ url_for('auth.logout') }}" data-libelle="Deconnexion">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 4v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>
+        </svg>
+        <span>Deconnexion</span>
+      </a>
+    </div>
   </aside>
 
   <div class="zone">

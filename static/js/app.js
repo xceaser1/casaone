@@ -157,6 +157,38 @@ function confirmerSuppression(texte) {
   });
 })();
 
+/* ------------------------------------------------ Sidebar : mode rail
+   Reduction du panneau a ses icones seules. La classe est deja posee avant le
+   premier rendu par un script en tete de <body> : ici on ne gere que la
+   bascule et sa memorisation. */
+(function () {
+  const bascule = document.getElementById('rail-bascule');
+  if (!bascule) return;
+  const CLE = 'casaone.nav.rail';
+
+  // En mode rail les intitules disparaissent : une pastille chiffree n'y a plus
+  // sa place, on marque la section pour afficher un simple point.
+  document.querySelectorAll('.nav-sect').forEach((sect) => {
+    if (sect.querySelector('.nav-badge')) sect.classList.add('a-badge');
+  });
+
+  function appliquer(actif) {
+    document.body.classList.toggle('rail', actif);
+    const texte = actif ? 'Deplier le menu' : 'Reduire le menu';
+    bascule.setAttribute('aria-label', texte);
+    bascule.setAttribute('title', texte);
+    bascule.setAttribute('aria-expanded', String(!actif));
+  }
+
+  appliquer(document.body.classList.contains('rail'));
+
+  bascule.addEventListener('click', () => {
+    const actif = !document.body.classList.contains('rail');
+    appliquer(actif);
+    try { localStorage.setItem(CLE, actif ? '1' : '0'); } catch (e) { /* mode prive */ }
+  });
+})();
+
 /* ------------------------------------------ Consultation hors ligne
    Quand le service worker sert une page depuis son cache, il pose sur <body>
    un attribut data-hors-ligne portant la date de mise en cache. La page
