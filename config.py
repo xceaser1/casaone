@@ -87,5 +87,16 @@ class Config:
     PERMANENT_SESSION_LIFETIME = 60 * 60 * 12  # 12 h
     MAX_COOKIE_SIZE = 4093
 
+    # --- Session longue pour le pointage hors ligne --------------------------
+    # Un telephone qui pointe au portail a 7 h peut rester hors couverture
+    # jusqu'au lendemain. Sans cookie "se souvenir de moi" de longue duree, la
+    # session expire et la file d'attente locale ne peut plus etre envoyee :
+    # les pointages seraient perdus. Le cookie reste HttpOnly et, en HTTPS,
+    # limite aux connexions chiffrees.
+    REMEMBER_COOKIE_DURATION = 60 * 60 * 24 * 30  # 30 jours
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SECURE = _HTTPS or _PROD
+
     PAGE_SIZE_DEFAULT = 25
     PAGE_SIZE_MAX = 200

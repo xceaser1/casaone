@@ -157,6 +157,51 @@ function confirmerSuppression(texte) {
   });
 })();
 
+/* ------------------------------------------ Consultation hors ligne
+   Quand le service worker sert une page depuis son cache, il pose sur <body>
+   un attribut data-hors-ligne portant la date de mise en cache. La page
+   affiche alors ce qu'elle est reellement : un etat passe, en lecture seule.
+   Laisser croire qu'une saisie a ete enregistree serait pire que la refuser. */
+(function () {
+  const marque = document.body.dataset.horsLigne;
+  if (marque === undefined) return;
+
+  document.body.classList.add('hors-ligne');
+
+  let quand = 'une date inconnue';
+  const d = new Date(marque);
+  if (marque && !isNaN(d)) {
+    quand = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+          + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  const bandeau = document.createElement('div');
+  bandeau.className = 'bandeau-hl';
+  bandeau.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>'
+    + '<span>Hors ligne — données du <b>' + quand + '</b>. La saisie est indisponible.</span>'
+    + '<button type="button">Réessayer</button>';
+  bandeau.querySelector('button').addEventListener('click', () => location.reload());
+
+  const hote = document.querySelector('.contenu') || document.querySelector('.zone') || document.body;
+  hote.insertBefore(bandeau, hote.firstChild);
+
+  // Garde-fou serveur-independant : aucune ecriture ne peut partir d'une page
+  // qui n'a pas de reseau. On bloque a la source plutot que d'echouer plus tard.
+  document.addEventListener('submit', (e) => {
+    if (e.target.method && e.target.method.toLowerCase() === 'post') {
+      e.preventDefault();
+      bandeau.classList.add('secoue');
+      setTimeout(() => bandeau.classList.remove('secoue'), 500);
+    }
+  }, true);
+
+  // Le retour du reseau recharge la page pour retrouver les donnees fraiches.
+  window.addEventListener('online', () => location.reload());
+})();
+
 /* ------------------------------------ Sidebar : sections repliables
    Chaque groupe de la barre laterale est un <details> : il fonctionne donc
    sans JavaScript. Le script ajoute deux choses : la memorisation de l'etat

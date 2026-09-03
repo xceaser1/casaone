@@ -130,6 +130,16 @@ def _enregistrer_pwa(app):
         reponse.headers["Cache-Control"] = "no-cache"
         return reponse
 
+    # La file d'attente est importee par le service worker via importScripts.
+    # Servie depuis /static, elle heriterait du cache d'un an et le worker
+    # pourrait continuer a executer une version perimee apres un deploiement.
+    @app.route("/file-attente.js")
+    def file_attente():
+        reponse = send_from_directory(os.path.join(app.static_folder, "js"), "file-attente.js")
+        reponse.headers["Content-Type"] = "application/javascript"
+        reponse.headers["Cache-Control"] = "no-cache"
+        return reponse
+
 
 def initialiser_projet_principal(app):
     """Cree la fiche du projet principal (CASA ONE / CFAO) si aucune n'existe."""

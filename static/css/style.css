@@ -932,3 +932,28 @@ input[type=range]::-moz-range-thumb {
   .nav-sect > summary { padding: 11px 14px; font-size: .68rem; }
   .nav-sect-corps { margin-left: 14px; }
 }
+
+/* ------------------------------------------- Bandeau de consultation hors ligne */
+.bandeau-hl {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 16px; padding: 11px 14px;
+  background: #fff7e6; border: 1px solid #f2d9a0; border-radius: var(--r-m);
+  color: #8a5a00; font-size: .87rem;
+}
+.bandeau-hl svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.bandeau-hl span { flex: 1; min-width: 0; }
+.bandeau-hl b { font-weight: 650; }
+.bandeau-hl button {
+  border: 1px solid #d98a00; background: #fff; color: #8a5a00;
+  border-radius: 9px; padding: 6px 12px; font-weight: 600; font-size: .82rem; cursor: pointer;
+}
+.bandeau-hl.secoue { animation: hl-secoue .45s ease; }
+@keyframes hl-secoue {
+  0%, 100% { transform: none; }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+/* Lecture seule : les commandes d'ecriture sont visiblement neutralisees. */
+body.hors-ligne .btn-primaire,
+body.hors-ligne .btn-danger,
+body.hors-ligne form button[type="submit"] { opacity: .45; pointer-events: none; }

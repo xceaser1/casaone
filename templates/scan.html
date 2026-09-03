@@ -17,6 +17,17 @@
     .sc-tete .ic-btn svg { width:20px; height:20px; }
     .sc-tete h1 { flex:1; text-align:center; font-size:1.15rem; color:var(--encre); margin:0; }
 
+    /* Bandeau de la file d'attente hors ligne */
+    .bandeau-file { display:flex; align-items:center; gap:10px; margin:0 16px 12px; padding:10px 12px;
+      background:#fff7e6; border:1px solid #f2d9a0; border-radius:14px; color:#8a5a00; font-size:.85rem; }
+    .bandeau-file[hidden] { display:none; }
+    .pastille-file { min-width:24px; height:24px; padding:0 7px; border-radius:99px; background:#d98a00; color:#fff;
+      display:grid; place-items:center; font-weight:700; font-size:.8rem; }
+    .bandeau-file span:nth-child(2) { flex:1; }
+    .bandeau-file button { border:1px solid #d98a00; background:#fff; color:#8a5a00; border-radius:9px;
+      padding:6px 12px; font-weight:600; font-size:.8rem; }
+    .bandeau-file button[disabled] { opacity:.55; }
+
     /* Segment Entree / Sortie */
     .sc-seg { display:flex; gap:6px; background:#fff; border:1px solid var(--bord); border-radius:14px; padding:5px; margin:6px 16px 14px; }
     .sc-seg button { flex:1; border:0; background:transparent; color:var(--doux); font-weight:650; font-size:.92rem; padding:11px; border-radius:10px; cursor:pointer; transition:.15s; }
@@ -142,6 +153,12 @@
     </div>
   </div>
 
+  <div class="bandeau-file" id="bandeau-file" hidden>
+    <span class="pastille-file" id="c-file">0</span>
+    <span id="txt-file">pointage en attente d'envoi</span>
+    <button type="button" id="btn-sync">Envoyer</button>
+  </div>
+
   <div class="compteurs">
     <div class="b"><b id="c-scan">0</b><span>Scannés</span></div>
     <div class="b"><b id="c-pres">—</b><span>Présents</span></div>
@@ -242,11 +259,61 @@
     liste.insertBefore(el, liste.firstChild);
   }
 
+  /* ------------------------------------------------ File d'attente locale */
+
+  var bandeau = document.getElementById('bandeau-file');
+  var btnSync = document.getElementById('btn-sync');
+
+  function rafraichirFile() {
+    return FileAttente.compter().then(function (n) {
+      bandeau.hidden = n === 0;
+      document.getElementById('c-file').textContent = n;
+      document.getElementById('txt-file').textContent =
+        'pointage' + (n > 1 ? 's' : '') + " en attente d'envoi";
+      return n;
+    }).catch(function () { return 0; });
+  }
+
+  function synchroniser() {
+    btnSync.disabled = true;
+    return Promise.resolve(window.casaoneSynchroniser && window.casaoneSynchroniser())
+      .catch(function () { return null; })
+      .then(rafraichirFile)
+      .then(function () { btnSync.disabled = false; });
+  }
+
+  btnSync.addEventListener('click', synchroniser);
+  navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', function (e) {
+    if (e.data && e.data.type === 'file-synchronisee') {
+      rafraichirFile();
+      var b = e.data.bilan;
+      if (b && typeof b.presents === 'number') {
+        document.getElementById('c-pres').textContent = b.presents;
+      }
+      if (b && b.refuses && b.refuses.length) {
+        etat.textContent = b.refuses.length + ' pointage(s) refusé(s) : badge inconnu.';
+      }
+    }
+  });
+  window.addEventListener('online', function () { etat.textContent = 'Réseau retrouvé — envoi en cours'; });
+  rafraichirFile();
+
+  /* ------------------------------------------------------------- Envoi */
+
+  /* Le pointage est date par le TELEPHONE, pas par le serveur : un badge
+     scanne a 7 h 12 et transmis a 18 h doit rester enregistre a 7 h 12. */
   async function envoyer(payload) {
+    payload.heure = new Date().toISOString();
+    var localHeure = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
     try {
       var r = await fetch('{{ url_for('pointage.checkin') }}', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin', body: JSON.stringify(payload)
       });
+      var type = r.headers.get('Content-Type') || '';
+      // Session expiree : la reponse est la page de connexion, pas du JSON.
+      if (type.indexOf('json') < 0) throw new Error('session');
       var d = await r.json();
       if (!r.ok || !d.ok) { etat.textContent = d.erreur || 'Badge refusé'; vibrer([40,60,40]); return; }
       scannes++; document.getElementById('c-scan').textContent = scannes;
@@ -255,7 +322,28 @@
       ajouterHistorique(d, payload.type);
       etat.textContent = 'Visez le badge suivant';
       vibrer(55);
-    } catch (e) { etat.textContent = 'Hors ligne — réessayez'; }
+    } catch (e) {
+      // Reseau ou session absents : on empile au lieu de perdre le pointage.
+      try {
+        await FileAttente.ajouter(payload);
+      } catch (err) {
+        etat.textContent = "Impossible d'enregistrer — réessayez";
+        vibrer([40, 60, 40]);
+        return;
+      }
+      var local = {
+        nom: payload.nom || payload.matricule || 'Badge enregistré',
+        matricule: payload.matricule || '',
+        fonction: '', heure: localHeure, deja: false
+      };
+      scannes++; document.getElementById('c-scan').textContent = scannes;
+      afficherResultat(local, payload.type);
+      ajouterHistorique(local, payload.type);
+      etat.textContent = 'Hors ligne — pointage mis en attente';
+      vibrer(55);
+      await rafraichirFile();
+      if (navigator.onLine) synchroniser();
+    }
   }
 
   function extraireToken(x) { var i = x.indexOf('/p/'); return i >= 0 ? x.slice(i + 3).split(/[?#]/)[0] : x; }

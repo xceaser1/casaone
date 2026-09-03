@@ -10,13 +10,14 @@ import csv
 import io
 import socket
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, Response, jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from models.db import db
 from models.mainoeuvre import Ouvrier
@@ -27,6 +28,9 @@ from services.contexte import projet_actif_id
 from services.security import exige
 
 bp = Blueprint("pointage", __name__)
+
+# Garde-fou sur la taille d'un lot de synchronisation.
+MAX_LOT = 500
 
 
 def _ip_locale():
@@ -46,27 +50,112 @@ def _url_base():
     return f"{request.scheme}://{_ip_locale()}:{port}"
 
 
-def _enregistrer(projet_id, matricule, nom, type_, methode, saisi_par):
-    """Enregistre (ou met a jour) une presence. Renvoie (presence, deja_existant)."""
-    jour = date.today()
+# Tolerance sur l'horloge du telephone : au-dela, on ne fait pas confiance a
+# une heure situee dans le futur (telephone mal regle) et on retient l'heure
+# du serveur.
+DERIVE_HORLOGE = timedelta(minutes=5)
+
+
+def heure_appareil(valeur):
+    """Convertit une heure ISO envoyee par le telephone en datetime local.
+
+    Renvoie None si la valeur est absente ou illisible : l'appelant retombe
+    alors sur l'heure du serveur. Une heure dans le futur est ramenee a
+    maintenant ; une heure passee est conservee telle quelle, car un pointage
+    peut legitimement avoir ete enregistre hors ligne plusieurs jours plus tot.
+    """
+    if not valeur:
+        return None
+    try:
+        h = datetime.fromisoformat(str(valeur).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if h.tzinfo is not None:
+        h = h.astimezone().replace(tzinfo=None)
+    maintenant = datetime.now()
+    return maintenant if h > maintenant + DERIVE_HORLOGE else h
+
+
+def _enregistrer(projet_id, matricule, nom, type_, methode, saisi_par,
+                 heure=None, differe=False, commit=True):
+    """Enregistre (ou met a jour) une presence. Renvoie (presence, deja_existant).
+
+    `heure` permet de dater le pointage a l'heure de l'appareil : un badge
+    scanne a 7 h 12 hors ligne et transmis a 18 h doit rester date de 7 h 12.
+    Le jour est deduit de cette heure, pas de la date de reception.
+
+    `differe` signale un pointage rejoue depuis la file d'attente locale. Dans
+    ce cas on fusionne au lieu d'ecraser : une entree conserve l'heure la plus
+    tot, une sortie la plus tard. Vider la file ne peut donc jamais degrader
+    une heure deja correcte, quel que soit l'ordre d'arrivee.
+    """
+    if heure is None:
+        heure = datetime.now()
+    jour = heure.date()
     existant = Presence.query.filter_by(
         projet_id=projet_id, jour=jour, matricule=matricule, nom=nom, type=type_
     ).first()
     deja = existant is not None
-    maintenant = datetime.now()
     if existant:
-        existant.heure = maintenant
-        existant.methode = methode
-        existant.saisi_par = saisi_par
+        if differe:
+            existant.heure = (
+                min(existant.heure, heure) if type_ == "entree"
+                else max(existant.heure, heure)
+            )
+        else:
+            existant.heure = heure
+            existant.methode = methode
+            existant.saisi_par = saisi_par
         enreg = existant
     else:
         enreg = Presence(
             projet_id=projet_id, matricule=matricule, nom=nom, jour=jour, type=type_,
-            heure=maintenant, methode=methode, saisi_par=saisi_par,
+            heure=heure, methode=methode, saisi_par=saisi_par,
         )
         db.session.add(enreg)
-    db.session.commit()
+    if commit:
+        db.session.commit()
     return enreg, deja
+
+
+def _resoudre(d):
+    """Identifie l'ouvrier vise par un pointage (badge signe ou matricule).
+
+    Renvoie (projet_id, matricule, nom, methode, erreur). L'erreur, quand elle
+    est presente, est definitive : rejouer la meme donnee echouera pareil, donc
+    le client doit la retirer de sa file plutot que de boucler indefiniment.
+    """
+    token = (d.get("token") or "").strip()
+    if token:
+        info = svc_badges.decoder_token(token)
+        if info is None:
+            return None, None, None, None, "Badge non reconnu."
+        pid, mat, nom = info
+        return pid, mat, nom, "scan", None
+
+    pid = projet_actif_id()
+    mat = (d.get("matricule") or "").strip()
+    nom = (d.get("nom") or "").strip()
+    if not (mat or nom):
+        return None, None, None, None, "Matricule ou nom requis."
+    if mat and not nom:
+        row = (
+            Ouvrier.query.filter_by(projet_id=pid, matricule_chantier=mat)
+            .order_by(Ouvrier.mois.desc())
+            .first()
+        )
+        if row is None:
+            return None, None, None, None, f"Matricule « {mat} » introuvable."
+        nom = row.nom or ""
+    return pid, mat, nom, "manuel", None
+
+
+def _fonction(projet_id, matricule, nom):
+    """Fonction connue de l'ouvrier (dernier mois renseigne)."""
+    q = Ouvrier.query.filter_by(projet_id=projet_id)
+    q = q.filter_by(matricule_chantier=matricule) if matricule else q.filter_by(nom=nom)
+    row = q.order_by(Ouvrier.mois.desc()).first()
+    return (row.fonction or "") if row else ""
 
 
 def _presences_jour(projet_id, jour):
@@ -206,48 +295,86 @@ def presences():
 def checkin():
     d = request.get_json(silent=True) or {}
     type_ = d.get("type") if d.get("type") in ("entree", "sortie") else "entree"
-    token = (d.get("token") or "").strip()
 
-    if token:
-        info = svc_badges.decoder_token(token)
-        if info is None:
-            return jsonify({"ok": False, "erreur": "Badge non reconnu."}), 400
-        pid, mat, nom = info
-        methode = "scan"
-    else:
-        pid = projet_actif_id()
-        mat = (d.get("matricule") or "").strip()
-        nom = (d.get("nom") or "").strip()
-        methode = "manuel"
-        if not (mat or nom):
-            return jsonify({"ok": False, "erreur": "Matricule ou nom requis."}), 400
-        if mat and not nom:
-            row = (
-                Ouvrier.query.filter_by(projet_id=pid, matricule_chantier=mat)
-                .order_by(Ouvrier.mois.desc())
-                .first()
-            )
-            if row is None:
-                return jsonify({"ok": False, "erreur": f"Matricule « {mat} » introuvable."}), 404
-            nom = row.nom or ""
+    pid, mat, nom, methode, erreur = _resoudre(d)
+    if erreur:
+        return jsonify({"ok": False, "erreur": erreur, "definitif": True}), 400
 
-    enreg, deja = _enregistrer(pid, mat, nom, type_, methode, current_user.username)
+    enreg, deja = _enregistrer(
+        pid, mat, nom, type_, methode, current_user.username,
+        heure=heure_appareil(d.get("heure")),
+    )
     presents = Presence.query.filter_by(projet_id=pid, jour=date.today(), type="entree").count()
-    # Fonction (pour la fiche resultat du scanner) : dernier mois connu.
-    fonction = ""
-    q = Ouvrier.query.filter_by(projet_id=pid)
-    q = q.filter_by(matricule_chantier=mat) if mat else q.filter_by(nom=nom)
-    row = q.order_by(Ouvrier.mois.desc()).first()
-    if row:
-        fonction = row.fonction or ""
     return jsonify({
         "ok": True,
         "nom": nom or mat or "Ouvrier",
         "matricule": mat,
-        "fonction": fonction,
+        "fonction": _fonction(pid, mat, nom),
         "type": type_,
         "heure": enreg.heure.strftime("%H:%M"),
         "deja": deja,
+        "presents": presents,
+    })
+
+
+# --------------------------------------------------------------------------
+@bp.route("/api/checkin/lot", methods=["POST"])
+@login_required
+@exige("pointage")
+def checkin_lot():
+    """Vide la file d'attente d'un telephone qui a pointe hors ligne.
+
+    Chaque element porte l'heure relevee par l'appareil et un identifiant
+    client (`uuid`) qui sert uniquement au telephone a retirer les bonnes
+    lignes de sa file. L'idempotence, elle, est assuree par la contrainte
+    d'unicite (projet, jour, matricule, nom, type) du modele Presence :
+    rejouer deux fois le meme lot ne cree pas de doublon.
+
+    Les erreurs de validation sont marquees `definitif` : le client doit alors
+    abandonner la ligne au lieu de la reessayer sans fin.
+    """
+    d = request.get_json(silent=True) or {}
+    items = d.get("pointages")
+    if not isinstance(items, list):
+        return jsonify({"ok": False, "erreur": "Liste de pointages attendue."}), 400
+    if len(items) > MAX_LOT:
+        return jsonify({"ok": False, "erreur": f"Lot trop volumineux (max {MAX_LOT})."}), 413
+
+    resultats, projets = [], set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        uid = item.get("uuid")
+        type_ = item.get("type") if item.get("type") in ("entree", "sortie") else "entree"
+        pid, mat, nom, methode, erreur = _resoudre(item)
+        if erreur:
+            resultats.append({"uuid": uid, "ok": False, "erreur": erreur, "definitif": True})
+            continue
+        try:
+            _enregistrer(
+                pid, mat, nom, type_, methode, current_user.username,
+                heure=heure_appareil(item.get("heure")), differe=True, commit=False,
+            )
+            db.session.commit()
+        except IntegrityError:
+            # Course entre deux telephones sur le meme badge : la contrainte
+            # d'unicite a tranche, la presence existe donc bien. Rien a refaire.
+            db.session.rollback()
+        except SQLAlchemyError:
+            db.session.rollback()
+            resultats.append({"uuid": uid, "ok": False, "erreur": "Enregistrement impossible."})
+            continue
+        projets.add(pid)
+        resultats.append({"uuid": uid, "ok": True})
+
+    pid_actif = projet_actif_id()
+    presents = Presence.query.filter_by(
+        projet_id=pid_actif, jour=date.today(), type="entree"
+    ).count()
+    return jsonify({
+        "ok": True,
+        "resultats": resultats,
+        "recus": sum(1 for r in resultats if r["ok"]),
         "presents": presents,
     })
 
