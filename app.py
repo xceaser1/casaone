@@ -14,6 +14,7 @@ from models import livraison as _livraison_models  # noqa: F401  (enregistre la 
 from models import engin as _engin_models  # noqa: F401  (enregistre la table engins)
 from models import metier as _metier_models  # noqa: F401
 from models import presence as _presence_models  # noqa: F401  (enregistre la table presences)
+from models import stock as _stock_models  # noqa: F401  (depots, articles, mouvements)
 from models.projet import Projet
 
 login_manager = LoginManager()
@@ -47,6 +48,7 @@ def creer_app(config_class=Config):
     from routes.page_routes import bp as pages_bp
     from routes.pointage_routes import bp as pointage_bp
     from routes.projet_routes import bp as projets_bp
+    from routes.stock_routes import bp as stock_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(pages_bp)
@@ -54,11 +56,13 @@ def creer_app(config_class=Config):
     app.register_blueprint(admin_bp)
     app.register_blueprint(projets_bp)
     app.register_blueprint(pointage_bp)
+    app.register_blueprint(stock_bp)
 
     _enregistrer_contexte(app)
     _enregistrer_erreurs(app)
     _enregistrer_securite(app)
     _enregistrer_pwa(app)
+    _enregistrer_compression(app)
     _enregistrer_cli(app)
 
     with app.app_context():
@@ -68,6 +72,50 @@ def creer_app(config_class=Config):
         initialiser_projet_principal(app)
 
     return app
+
+
+def _enregistrer_compression(app):
+    """Compresse les reponses texte (HTML, CSS, JS, JSON).
+
+    Sur une connexion mobile, c'est le gain le plus important : les fichiers
+    de la librairie de graphiques ou la feuille de style passent de plusieurs
+    centaines de kilo-octets a quelques dizaines.
+    """
+    import gzip
+
+    TYPES = ("text/html", "text/css", "application/javascript", "text/javascript",
+             "application/json", "image/svg+xml", "text/plain")
+    SEUIL = 1024  # inutile de compresser les toutes petites reponses
+
+    @app.after_request
+    def _compresser(reponse):
+        if "gzip" not in (request.headers.get("Accept-Encoding") or ""):
+            return reponse
+        if reponse.status_code < 200 or reponse.status_code >= 300:
+            return reponse
+        if reponse.headers.get("Content-Encoding"):
+            return reponse
+        if not (reponse.mimetype or "").startswith(TYPES):
+            return reponse
+        # Les fichiers statiques sont servis en flux direct : il faut desactiver
+        # ce mode pour pouvoir lire puis compresser leur contenu. C'est le gain
+        # le plus important (la librairie de graphiques passe de 205 a ~60 Ko).
+        if reponse.direct_passthrough:
+            taille = reponse.headers.get("Content-Length", type=int) or 0
+            if taille > 4 * 1024 * 1024:      # trop gros : on laisse tel quel
+                return reponse
+            reponse.direct_passthrough = False
+        donnees = reponse.get_data()
+        if len(donnees) < SEUIL:
+            return reponse
+        compresse = gzip.compress(donnees, 6)
+        if len(compresse) >= len(donnees):
+            return reponse
+        reponse.set_data(compresse)
+        reponse.headers["Content-Encoding"] = "gzip"
+        reponse.headers["Content-Length"] = str(len(compresse))
+        reponse.headers.add("Vary", "Accept-Encoding")
+        return reponse
 
 
 def _enregistrer_pwa(app):

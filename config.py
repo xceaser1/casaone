@@ -63,6 +63,10 @@ class Config:
     SQLALCHEMY_DATABASE_URI = _normaliser_db(
         os.environ.get("DATABASE_URL")
     ) or ("sqlite:///" + os.path.join(BASE_DIR, "database", "casaone.db"))
+    # Les URL des fichiers statiques portent une empreinte de version
+    # (?v=<date>) : on peut donc les mettre en cache tres longtemps.
+    SEND_FILE_MAX_AGE_DEFAULT = 31536000  # 1 an
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 

@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block titre %}Stock{% endblock %}
+{% block sous_entete %}État des dépôts — {{ projet_actif.nom if projet_actif else projet_nom }}{% endblock %}
+
+{% block contenu %}
+<div class="presences-barre">
+  <p class="badges-info">
+    Le stock est calculé à partir du journal des mouvements : chaque quantité est justifiée
+    par une écriture datée.
+  </p>
+  <div class="presences-actions">
+    {% if peut('stock', 'create') %}
+    <button class="btn btn-vert" onclick="ouvrirModale('m-transfert')">{{ ico('livraisons') }} Transfert</button>
+    <button class="btn btn-fonce" onclick="ouvrirModale('m-mouvement')">{{ ico('plus') }} Mouvement</button>
+    {% endif %}
+    {% if peut('stock', 'export') %}
+    <a class="btn" href="{{ url_for('stock.export', fmt='xlsx') }}">{{ ico('export') }} Excel</a>
+    {% endif %}
+    <a class="btn" href="{{ url_for('stock.mouvements') }}">Journal</a>
+  </div>
+</div>
+
+<div class="grille-kpi">
+  <div class="kpi accent">
+    <span class="kpi-ic">{{ ico('dalles') }}</span>
+    <div class="kpi-body">
+      <span class="lib">Articles suivis</span>
+      <div class="val">{{ lignes|length }}</div>
+      <div class="note">{{ depots|length }} dépôt{{ 's' if depots|length > 1 }} actif{{ 's' if depots|length > 1 }}</div>
+    </div>
+  </div>
+  <div class="kpi">
+    <span class="kpi-ic" style="background:#f97316">{{ ico('validation') }}</span>
+    <div class="kpi-body">
+      <span class="lib">Sous le seuil</span>
+      <div class="val">{{ alertes }}</div>
+      <div class="note">à réapprovisionner</div>
+    </div>
+  </div>
+  <div class="kpi">
+    <span class="kpi-ic" style="background:#0ea5e9">{{ ico('projets') }}</span>
+    <div class="kpi-body">
+      <span class="lib">Dépôts</span>
+      <div class="val">{{ depots|length }}</div>
+      <div class="note">lieux de stockage</div>
+    </div>
+  </div>
+</div>
+
+{% if not depots %}
+<div class="carte" style="padding:34px;text-align:center;color:var(--doux)">
+  <b style="display:block;color:var(--encre);margin-bottom:6px">Aucun dépôt</b>
+  Créez d'abord un dépôt (magasin, aire de ferraillage…) pour commencer à suivre le stock.
+  {% if peut('stock', 'create') %}
+  <div style="margin-top:14px"><button class="btn btn-fonce" onclick="ouvrirModale('m-depot')">Créer un dépôt</button></div>
+  {% endif %}
+</div>
+{% else %}
+
+<div class="carte">
+  <div class="carte-tete">
+    <h3>Stock par dépôt</h3>
+    <div style="display:flex;gap:8px;align-items:center">
+      {% if peut('stock', 'create') %}
+      <button class="btn mini" onclick="ouvrirModale('m-depot')">+ Dépôt</button>
+      <button class="btn mini" onclick="ouvrirModale('m-article')">+ Article</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="pres-filtres">
+    <div class="pres-recherche">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="stock-q" type="search" placeholder="Rechercher un article…" autocomplete="off">
+    </div>
+    <label style="display:flex;align-items:center;gap:7px;font-size:.85rem;color:var(--doux)">
+      <input type="checkbox" id="stock-alerte" style="width:auto"> Sous le seuil seulement
+    </label>
+  </div>
+
+  <div class="tableau-enveloppe">
+    <table class="tableau-simple" id="tbl-stock">
+      <thead>
+        <tr>
+          <th>Article</th>
+          {% for d in depots %}<th class="num" title="{{ d.nom }}">{{ d.code }}</th>{% endfor %}
+          <th class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in lignes %}
+        <tr data-alerte="{{ 1 if l.alerte else 0 }}"
+            data-recherche="{{ ((l.article.code or '') ~ ' ' ~ l.article.designation ~ ' ' ~ (l.article.categorie or '')) | lower }}">
+          <td>
+            <b>{{ l.article.designation }}</b>
+            <span style="color:var(--doux);font-size:.8rem">
+              {{ l.article.code }}{% if l.article.categorie %} · {{ l.article.categorie }}{% endif %}
+            </span>
+          </td>
+          {% for d in depots %}
+          <td class="num">{{ '%g'|format(l.detail.get(d.id, 0)) }}</td>
+          {% endfor %}
+          <td class="num">
+            <b>{{ '%g'|format(l.total) }}</b> <span style="color:var(--doux)">{{ l.article.unite }}</span>
+            {% if l.alerte %}<span class="badge-statut b-ambre" style="margin-left:6px">Seuil</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not lignes %}
+        <tr><td colspan="{{ depots|length + 2 }}" style="text-align:center;color:var(--doux);padding:30px">
+          Aucun article. Créez-en un pour commencer.
+        </td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ------------------------------------------------------- Modale : transfert #}
+{% if peut('stock', 'create') %}
+<div class="modale-fond" id="m-transfert">
+  <form class="modale" method="post" action="{{ url_for('stock.creer_mouvement') }}">
+    <h3>Transfert entre dépôts</h3>
+    <div class="corps">
+      <input type="hidden" name="type" value="transfert">
+      <div class="form-grille">
+        <label class="champ"><span>Article</span>
+          <select name="article_id" required>
+            <option value="">— choisir —</option>
+            {% for a in filtres.articles %}<option value="{{ a.id }}">{{ a.designation }} ({{ a.unite }})</option>{% endfor %}
+          </select>
+        </label>
+        <label class="champ"><span>Quantité</span>
+          <input name="quantite" inputmode="decimal" required placeholder="0"></label>
+        <label class="champ"><span>Dépôt d'origine</span>
+          <select name="depot_source_id" required>
+            <option value="">— choisir —</option>
+            {% for d in depots %}<option value="{{ d.id }}">{{ d.code }} — {{ d.nom }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="champ"><span>Dépôt de destination</span>
+          <select name="depot_dest_id" required>
+            <option value="">— choisir —</option>
+            {% for d in depots %}<option value="{{ d.id }}">{{ d.code }} — {{ d.nom }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="champ"><span>Date</span>
+          <input type="date" name="date_mouvement" value="{{ aujourdhui.isoformat() }}"></label>
+        <label class="champ"><span>Référence</span>
+          <input name="reference" placeholder="Bon de transfert"></label>
+      </div>
+      <label class="champ"><span>Motif</span>
+        <input name="motif" placeholder="Besoin sur la zone B3…"></label>
+    </div>
+    <div class="pied">
+      <button type="button" class="btn" data-fermer>Annuler</button>
+      <button type="submit" class="btn btn-fonce">Enregistrer le transfert</button>
+    </div>
+  </form>
+</div>
+
+{# ------------------------------------------ Modale : entrée / sortie simple #}
+<div class="modale-fond" id="m-mouvement">
+  <form class="modale" method="post" action="{{ url_for('stock.creer_mouvement') }}">
+    <h3>Entrée / sortie de stock</h3>
+    <div class="corps">
+      <div class="pres-onglets" id="mvt-type" style="padding:0 0 14px">
+        <button type="button" class="on" data-t="entree">Entrée</button>
+        <button type="button" data-t="sortie">Sortie</button>
+      </div>
+      <input type="hidden" name="type" id="mvt-type-val" value="entree">
+      <div class="form-grille">
+        <label class="champ"><span>Article</span>
+          <select name="article_id" required>
+            <option value="">— choisir —</option>
+            {% for a in filtres.articles %}<option value="{{ a.id }}">{{ a.designation }} ({{ a.unite }})</option>{% endfor %}
+          </select>
+        </label>
+        <label class="champ"><span>Quantité</span>
+          <input name="quantite" inputmode="decimal" required placeholder="0"></label>
+        <label class="champ" id="ch-dest"><span>Dépôt de destination</span>
+          <select name="depot_dest_id">
+            <option value="">— choisir —</option>
+            {% for d in depots %}<option value="{{ d.id }}">{{ d.code }} — {{ d.nom }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="champ" id="ch-source" hidden><span>Dépôt d'origine</span>
+          <select name="depot_source_id">
+            <option value="">— choisir —</option>
+            {% for d in depots %}<option value="{{ d.id }}">{{ d.code }} — {{ d.nom }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="champ"><span>Date</span>
+          <input type="date" name="date_mouvement" value="{{ aujourdhui.isoformat() }}"></label>
+        <label class="champ"><span>Référence</span>
+          <input name="reference" placeholder="Bon de livraison / de sortie"></label>
+      </div>
+      <label class="champ"><span>Motif</span><input name="motif"></label>
+    </div>
+    <div class="pied">
+      <button type="button" class="btn" data-fermer>Annuler</button>
+      <button type="submit" class="btn btn-fonce">Enregistrer</button>
+    </div>
+  </form>
+</div>
+
+{# --------------------------------------------------------- Modale : dépôt #}
+<div class="modale-fond" id="m-depot">
+  <form class="modale" method="post" action="{{ url_for('stock.creer_depot') }}">
+    <h3>Nouveau dépôt</h3>
+    <div class="corps">
+      <div class="form-grille">
+        <label class="champ"><span>Code</span>
+          <input name="code" required maxlength="24" placeholder="MAG1" style="text-transform:uppercase"></label>
+        <label class="champ"><span>Nom</span>
+          <input name="nom" required placeholder="Magasin central"></label>
+        <label class="champ"><span>Emplacement</span><input name="emplacement" placeholder="Zone A"></label>
+        <label class="champ"><span>Responsable</span><input name="responsable"></label>
+      </div>
+    </div>
+    <div class="pied">
+      <button type="button" class="btn" data-fermer>Annuler</button>
+      <button type="submit" class="btn btn-fonce">Créer le dépôt</button>
+    </div>
+  </form>
+</div>
+
+{# -------------------------------------------------------- Modale : article #}
+<div class="modale-fond" id="m-article">
+  <form class="modale" method="post" action="{{ url_for('stock.creer_article') }}">
+    <h3>Nouvel article</h3>
+    <div class="corps">
+      <div class="form-grille">
+        <label class="champ"><span>Code</span>
+          <input name="code" required maxlength="32" placeholder="CIM42" style="text-transform:uppercase"></label>
+        <label class="champ"><span>Désignation</span>
+          <input name="designation" required placeholder="Ciment CPJ 45"></label>
+        <label class="champ"><span>Catégorie</span><input name="categorie" placeholder="Liants"></label>
+        <label class="champ"><span>Unité</span><input name="unite" value="U" placeholder="sac, kg, m3…"></label>
+        <label class="champ"><span>Seuil d'alerte <em>(0 = aucun)</em></span>
+          <input name="seuil_alerte" inputmode="decimal" value="0"></label>
+      </div>
+    </div>
+    <div class="pied">
+      <button type="button" class="btn" data-fermer>Annuler</button>
+      <button type="submit" class="btn btn-fonce">Créer l'article</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Bascule entrée / sortie : on affiche le dépôt pertinent. */
+document.querySelectorAll('#mvt-type button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#mvt-type button').forEach(x => x.classList.toggle('on', x === b));
+  const entree = b.dataset.t === 'entree';
+  document.getElementById('mvt-type-val').value = b.dataset.t;
+  document.getElementById('ch-dest').hidden = !entree;
+  document.getElementById('ch-source').hidden = entree;
+  document.querySelector('#ch-dest select').required = entree;
+  document.querySelector('#ch-source select').required = !entree;
+}));
+
+/* Filtres du tableau de stock : recherche + articles sous le seuil. */
+(function () {
+  const q = document.getElementById('stock-q');
+  const alerte = document.getElementById('stock-alerte');
+  const lignes = Array.from(document.querySelectorAll('#tbl-stock tbody tr[data-recherche]'));
+  if (!lignes.length) return;
+  function appliquer() {
+    const texte = (q.value || '').trim().toLowerCase();
+    lignes.forEach(tr => {
+      const ok = (!texte || tr.dataset.recherche.includes(texte))
+              && (!alerte.checked || tr.dataset.alerte === '1');
+      tr.style.display = ok ? '' : 'none';
+    });
+  }
+  q.addEventListener('input', appliquer);
+  alerte.addEventListener('change', appliquer);
+})();
+</script>
+{% endblock %}
