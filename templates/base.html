@@ -31,6 +31,17 @@
 </a>
 {% endmacro %}
 
+{% macro section(titre, id, pages) %}
+<details class="nav-sect" data-sect="{{ id }}" {{ 'open' if page in pages }}>
+  <summary>
+    <span>{{ titre }}</span>
+    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+  </summary>
+  <div class="nav-sect-corps">{{ caller() }}</div>
+</details>
+{% endmacro %}
+
 <!doctype html>
 <html lang="fr">
 <head>
@@ -83,73 +94,86 @@
       </details>
     </div>
     <nav class="nav">
+      {# Acces directs : toujours visibles, hors sections #}
       {% if peut('projets') %}{{ lien(url_for('projets.index'), 'projets', page, 'Projets', 'projets') }}{% endif %}
       {% if peut('dashboard') %}{{ lien(url_for('pages.dashboard'), 'dashboard', page, 'Dashboard', 'dashboard') }}{% endif %}
 
-      <div class="nav-titre">Suivi de production</div>
-      {% if peut('surfaces') %}{{ lien(url_for('pages.plan_interactif'), 'plan', page, 'Plan du projet', 'plan') }}{% endif %}
-      {% if peut('surfaces') %}{{ lien(url_for('pages.surfaces'), 'surfaces', page, 'Tableau de surfaces', 'surfaces') }}{% endif %}
-      {% if peut('betonnage') %}{{ lien(url_for('pages.betonnage'), 'betonnage', page, 'Betonnage mensuelle', 'betonnage') }}{% endif %}
-      {% if peut('livraisons') %}
-      {{ lien(url_for('pages.livraisons'), 'livraisons', page, 'Livraisons béton', 'livraisons') }}
-      <div class="sous-nav">
-        {{ lien(url_for('pages.livraisons_registre'), 'livraisons-registre', page, 'Journal des livraisons') }}
-      </div>
-      {% endif %}
-      {% if peut('engins') %}
-      {{ lien(url_for('pages.engins'), 'engins', page, 'Matériel & engins', 'engins') }}
-      <div class="sous-nav">
-        {{ lien(url_for('pages.engins_registre'), 'engins-registre', page, 'Parc matériel') }}
-      </div>
-      {% endif %}
-      {% if peut('validation') %}{{ lien(url_for('pages.validation'), 'validation', page, 'Validation des plans', 'validation') }}{% endif %}
+      {% call section('Suivi de production', 'production',
+          ['plan','surfaces','betonnage','livraisons','livraisons-registre','engins','engins-registre','validation']) %}
+        {% if peut('surfaces') %}{{ lien(url_for('pages.plan_interactif'), 'plan', page, 'Plan du projet', 'plan') }}{% endif %}
+        {% if peut('surfaces') %}{{ lien(url_for('pages.surfaces'), 'surfaces', page, 'Tableau de surfaces', 'surfaces') }}{% endif %}
+        {% if peut('betonnage') %}{{ lien(url_for('pages.betonnage'), 'betonnage', page, 'Betonnage mensuelle', 'betonnage') }}{% endif %}
+        {% if peut('livraisons') %}
+        {{ lien(url_for('pages.livraisons'), 'livraisons', page, 'Livraisons béton', 'livraisons') }}
+        <div class="sous-nav">
+          {{ lien(url_for('pages.livraisons_registre'), 'livraisons-registre', page, 'Journal des livraisons') }}
+        </div>
+        {% endif %}
+        {% if peut('engins') %}
+        {{ lien(url_for('pages.engins'), 'engins', page, 'Matériel & engins', 'engins') }}
+        <div class="sous-nav">
+          {{ lien(url_for('pages.engins_registre'), 'engins-registre', page, 'Parc matériel') }}
+        </div>
+        {% endif %}
+        {% if peut('validation') %}{{ lien(url_for('pages.validation'), 'validation', page, 'Validation des plans', 'validation') }}{% endif %}
+      {% endcall %}
 
       {% if peut('stock') %}
-      <div class="nav-titre">Stock</div>
-      {{ lien(url_for('stock.index'), 'stock', page, 'État du stock', 'dalles') }}
-      <div class="sous-nav">
-        {{ lien(url_for('stock.mouvements'), 'stock-mouvements', page, 'Journal des mouvements') }}
-      </div>
+      {% call section('Stock', 'stock', ['stock','stock-mouvements']) %}
+        {{ lien(url_for('stock.index'), 'stock', page, 'État du stock', 'dalles') }}
+        <div class="sous-nav">
+          {{ lien(url_for('stock.mouvements'), 'stock-mouvements', page, 'Journal des mouvements') }}
+        </div>
+      {% endcall %}
       {% endif %}
 
       {% if peut('dalles') %}
-      <div class="nav-titre">Dalles</div>
-      {{ lien(url_for('pages.dalles'), 'dalles', page, 'Tous les types', 'dalles') }}
-      <div class="sous-nav">
-        {{ lien(url_for('pages.dalles', slug='reticulee'), 'dalles-reticulee', page, 'Dalle réticulée') }}
-        {{ lien(url_for('pages.dalles', slug='pleine'), 'dalles-pleine', page, 'Dalle pleine') }}
-        {{ lien(url_for('pages.dalles', slug='post-tension'), 'dalles-post-tension', page, 'Dalle post-tension') }}
-        {{ lien(url_for('pages.dalles', slug='hourdis'), 'dalles-hourdis', page, 'Dalle hourdis') }}
-      </div>
+      {% call section('Dalles', 'dalles',
+          ['dalles','dalles-reticulee','dalles-pleine','dalles-post-tension','dalles-hourdis']) %}
+        {{ lien(url_for('pages.dalles'), 'dalles', page, 'Tous les types', 'dalles') }}
+        <div class="sous-nav">
+          {{ lien(url_for('pages.dalles', slug='reticulee'), 'dalles-reticulee', page, 'Dalle réticulée') }}
+          {{ lien(url_for('pages.dalles', slug='pleine'), 'dalles-pleine', page, 'Dalle pleine') }}
+          {{ lien(url_for('pages.dalles', slug='post-tension'), 'dalles-post-tension', page, 'Dalle post-tension') }}
+          {{ lien(url_for('pages.dalles', slug='hourdis'), 'dalles-hourdis', page, 'Dalle hourdis') }}
+        </div>
+      {% endcall %}
       {% endif %}
 
       {% if peut('diagrammes') %}
-      <div class="nav-titre">Diagrammes</div>
-      {{ lien(url_for('pages.diagrammes', axe='type'), 'diag-type', page, 'Par type', 'diagrammes') }}
-      {{ lien(url_for('pages.diagrammes', axe='niveau'), 'diag-niveau', page, 'Par niveau', 'diagrammes') }}
+      {% call section('Diagrammes', 'diagrammes', ['diag-type','diag-niveau']) %}
+        {{ lien(url_for('pages.diagrammes', axe='type'), 'diag-type', page, 'Par type', 'diagrammes') }}
+        {{ lien(url_for('pages.diagrammes', axe='niveau'), 'diag-niveau', page, 'Par niveau', 'diagrammes') }}
+      {% endcall %}
       {% endif %}
 
-      <div class="nav-titre">Finances</div>
-      {% if peut('couts') %}{{ lien(url_for('pages.couts'), 'couts', page, 'Suivi des coûts', 'couts') }}{% endif %}
+      {% if peut('couts') %}
+      {% call section('Finances', 'finances', ['couts']) %}
+        {{ lien(url_for('pages.couts'), 'couts', page, 'Suivi des coûts', 'couts') }}
+      {% endcall %}
+      {% endif %}
 
       {% if peut('mainoeuvre') %}
-      <div class="nav-titre">Ressources</div>
-      {{ lien(url_for('pages.mainoeuvre'), 'mainoeuvre', page, "Main-d'œuvre", 'mainoeuvre') }}
-      <div class="sous-nav">
-        {{ lien(url_for('pages.mainoeuvre_registre'), 'mainoeuvre-registre', page, 'Registre des ouvriers') }}
-      </div>
+      {% call section('Ressources', 'ressources', ['mainoeuvre','mainoeuvre-registre']) %}
+        {{ lien(url_for('pages.mainoeuvre'), 'mainoeuvre', page, "Main-d'œuvre", 'mainoeuvre') }}
+        <div class="sous-nav">
+          {{ lien(url_for('pages.mainoeuvre_registre'), 'mainoeuvre-registre', page, 'Registre des ouvriers') }}
+        </div>
+      {% endcall %}
       {% endif %}
 
       {% if peut('pointage') %}
-      <div class="nav-titre">Pointage</div>
-      {{ lien(url_for('pointage.presences'), 'presences', page, 'Présences du jour', 'presence') }}
-      {{ lien(url_for('pointage.scan'), 'scan', page, 'Scanner (mobile)', 'scan') }}
-      {{ lien(url_for('pointage.liste_badges'), 'badges', page, 'Badges QR', 'qr') }}
+      {% call section('Pointage', 'pointage', ['presences','scan','badges']) %}
+        {{ lien(url_for('pointage.presences'), 'presences', page, 'Présences du jour', 'presence') }}
+        {{ lien(url_for('pointage.scan'), 'scan', page, 'Scanner (mobile)', 'scan') }}
+        {{ lien(url_for('pointage.liste_badges'), 'badges', page, 'Badges QR', 'qr') }}
+      {% endcall %}
       {% endif %}
 
       {% if current_user.est_admin %}
-      <div class="nav-titre">Système</div>
-      {{ lien(url_for('admin.index'), 'admin', page, 'Administration', 'admin') }}
+      {% call section('Système', 'systeme', ['admin']) %}
+        {{ lien(url_for('admin.index'), 'admin', page, 'Administration', 'admin') }}
+      {% endcall %}
       {% endif %}
     </nav>
   </aside>
