@@ -6,10 +6,78 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CASA ONE">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/app/icon-180.png') }}">
+
+{# Portee du cache hors ligne : utilisateur + projet actif. Les pages mises en
+   cache ne sont jamais servies sous une autre portee, et tout est purge des
+   que cette valeur change (changement de projet) ou disparait (deconnexion). #}
+{% if current_user.is_authenticated %}
+<meta name="casaone-portee" content="u{{ current_user.id }}-p{{ projet_actif.id if projet_actif else 0 }}">
+{% endif %}
+
+<script src="{{ statique('js/file-attente.js') }}"></script>
 <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/sw.js').catch(function () {});
-    });
+(function () {
+  if (!('serviceWorker' in navigator)) return;
+
+  var balise = document.querySelector('meta[name="casaone-portee"]');
+  var portee = balise ? balise.content : null;
+
+  function annoncer(sw) {
+    if (sw) sw.postMessage({ type: 'portee', valeur: portee });
   }
+
+  /* Vide la file d'attente.
+     L'envoi immediat depuis la page est le mecanisme principal : il fonctionne
+     partout, y compris sur iOS et dans les WebView anciennes. Background Sync
+     n'est qu'un filet de securite qui reessaiera application fermee.
+
+     Piege : navigator.serviceWorker.ready NE SE RESOUT JAMAIS tant qu'aucun
+     worker n'est enregistre (navigation privee, worker refuse, contexte non
+     securise). En dependre laisserait la file bloquee sans aucun signal. On
+     l'assortit donc d'un delai, et on envoie de toute facon. */
+  function programmerRattrapage() {
+    if (!('serviceWorker' in navigator) || !window.ServiceWorkerRegistration
+        || !('sync' in window.ServiceWorkerRegistration.prototype)) {
+      return Promise.resolve(false);
+    }
+    return Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise(function (res) { setTimeout(function () { res(null); }, 1500); })
+    ]).then(function (reg) {
+      if (!reg || !reg.sync) return false;
+      return reg.sync.register(FileAttente.TAG_SYNC).then(
+        function () { return true; }, function () { return false; }
+      );
+    }).catch(function () { return false; });
+  }
+
+  window.casaoneSynchroniser = function () {
+    if (!navigator.onLine) return Promise.resolve(null);
+    return programmerRattrapage().then(function (rattrapagePrevu) {
+      return FileAttente.synchroniser().catch(function (e) {
+        // Le rattrapage prendra le relais ; sinon l'erreur doit remonter pour
+        // que l'interface puisse le dire a l'utilisateur.
+        if (rattrapagePrevu) return null;
+        throw e;
+      });
+    });
+  };
+
+  window.addEventListener('load', function () {
+    // Vidage au demarrage : volontairement independant du worker, pour qu'un
+    // enregistrement rate ne laisse pas des pointages bloques sur l'appareil.
+    FileAttente.compter().then(function (n) {
+      if (n > 0) window.casaoneSynchroniser();
+    }).catch(function () {});
+
+    navigator.serviceWorker.register('/sw.js').then(function (reg) {
+      annoncer(reg.active || navigator.serviceWorker.controller);
+      navigator.serviceWorker.ready
+        .then(function (pret) { annoncer(pret.active); })
+        .catch(function () {});
+    }).catch(function () {});
+  });
+
+  window.addEventListener('online', function () { window.casaoneSynchroniser(); });
+})();
 </script>
