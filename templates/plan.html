@@ -248,22 +248,55 @@ function construireMaquette3D() {
   const camera = new THREE.PerspectiveCamera(45, L / H, 0.1, 5000);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(L, H);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  // Densité plafonnée à 2 : au-delà, on quadruple le coût de rendu sans gain
+  // visible, et les téléphones du chantier peinent.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  hote.style.position = 'relative';
   hote.appendChild(renderer.domElement);
 
-  // Lumières
-  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
-  dir.position.set(300, 500, 200);
-  scene.add(dir);
+  // Lumières : un ciel qui éclaire par le haut et un sol qui renvoie par le
+  // bas donnent du volume, là où une lumière ambiante uniforme aplatissait
+  // tout — les façades avaient toutes exactement la même teinte.
+  scene.add(new THREE.HemisphereLight(0xdce8ff, 0x9aa6bd, 1.05));
 
-  // Sol
+  // Lumiere placee haut : rasante, elle projetait des ombres si longues que les
+  // neuf batiments fusionnaient en une seule tache, et le relief disparaissait.
+  const dir = new THREE.DirectionalLight(0xfff4e6, 0.85);
+  dir.position.set(880, 1250, 60);
+  dir.target.position.set(500, 0, 320);
+  dir.castShadow = true;
+  // Le cadrage de l'ombre doit couvrir tout le site : trop large, l'ombre
+  // devient floue et crénelée ; trop étroit, les bâtiments du bord n'en ont pas.
+  dir.shadow.mapSize.set(2048, 2048);
+  dir.shadow.camera.left = -560;
+  dir.shadow.camera.right = 560;
+  dir.shadow.camera.top = 420;
+  dir.shadow.camera.bottom = -420;
+  dir.shadow.camera.near = 200;
+  dir.shadow.camera.far = 2400;
+  dir.shadow.radius = 2;
+  dir.shadow.bias = -0.0009;
+  scene.add(dir);
+  scene.add(dir.target);
+
+  // Contre-jour discret : détache les volumes du fond sans écraser l'ombre.
+  const appoint = new THREE.DirectionalLight(0xbfd4fd, 0.28);
+  appoint.position.set(-200, 300, 700);
+  scene.add(appoint);
+
+  // Sol — il était resté vert (#e8f2ec) de l'ancienne palette.
   const sol = new THREE.Mesh(
-    new THREE.PlaneGeometry(1400, 1000),
-    new THREE.MeshLambertMaterial({ color: 0xe8f2ec })
+    new THREE.PlaneGeometry(1600, 1200),
+    new THREE.MeshStandardMaterial({ color: 0xdfe5f0, roughness: 0.95, metalness: 0.0 })
   );
   sol.rotation.x = -Math.PI / 2;
-  sol.position.set(500, 0, 320);
+  sol.position.set(500, -0.5, 320);
+  sol.receiveShadow = true;
   scene.add(sol);
 
   // Blocs : on réutilise les coordonnées ZONES du plan 2D
@@ -278,7 +311,7 @@ function construireMaquette3D() {
     // Corps du bâtiment : coque translucide (vide à l'intérieur, on voit au travers)
     const geo = new THREE.BoxGeometry(z.w, haut, z.h);
     const mat = new THREE.MeshLambertMaterial({
-      color: coul, transparent: true, opacity: 0.28,
+      color: coul, transparent: true, opacity: 0.38,
       side: THREE.DoubleSide, depthWrite: false,
     });
     const cube = new THREE.Mesh(geo, mat);
@@ -287,11 +320,17 @@ function construireMaquette3D() {
     scene.add(cube);
 
     // Toit légèrement plus foncé (débord)
+    // Toit : c'est LUI qui porte l'ombre, pas la coque. Une coque translucide
+    // avec depthWrite:false projette une ombre incoherente ; le bandeau de
+    // toiture, opaque, donne au sol l'empreinte exacte du batiment.
+    // Il etait reste vert fonce (#0f2419) de l'ancienne palette.
     const toit = new THREE.Mesh(
       new THREE.BoxGeometry(z.w + 6, 4, z.h + 6),
-      new THREE.MeshLambertMaterial({ color: 0x0f2419 })
+      new THREE.MeshStandardMaterial({ color: 0x1b2340, roughness: 0.7, metalness: 0.1 })
     );
     toit.position.set(z.x + z.w / 2, haut + 2, z.y + z.h / 2);
+    toit.castShadow = true;
+    toit.receiveShadow = true;
     scene.add(toit);
 
     // Lignes d'étages (arêtes horizontales) pour donner l'échelle
@@ -316,7 +355,12 @@ function construireMaquette3D() {
   });
 
   // Caméra orbitale (rotation manuelle, sans OrbitControls)
-  let angle = -0.6, elevation = 0.9, distance = 900;
+  const ray = new THREE.Raycaster(), souris = new THREE.Vector2();
+  let dernierMouv = Date.now();
+  // elevation en radians : plus la valeur est GRANDE, plus la vue est
+  // zenithale — et plus les hauteurs s'ecrasent. Autour de 0,5 rad (~29 deg)
+  // on lit a la fois l'implantation au sol et l'elevation des batiments.
+  let angle = -0.62, elevation = 0.5, distance = 1000;
   const cible = new THREE.Vector3(500, 40, 320);
   function placerCamera() {
     camera.position.set(
@@ -328,26 +372,134 @@ function construireMaquette3D() {
   }
   placerCamera();
 
-  // Interaction souris : rotation
+  /* Navigation amortie.
+     La version precedente deplacait la camera a chaque evenement : le mouvement
+     s'arretait net au relachement. On accumule desormais une vitesse, amortie
+     image par image, et la distance rejoint sa cible progressivement. */
   let glisse = false, xPrec = 0, yPrec = 0;
-  renderer.domElement.addEventListener('mousedown', e => { glisse = true; xPrec = e.clientX; yPrec = e.clientY; });
-  window.addEventListener('mouseup', () => glisse = false);
-  window.addEventListener('mousemove', e => {
+  let vAngle = 0, vElevation = 0, distanceCible = distance;
+
+  function borner(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function debutGlisse(x, y) { glisse = true; xPrec = x; yPrec = y; vAngle = vElevation = 0; }
+  function pendantGlisse(x, y) {
     if (!glisse) return;
-    angle += (e.clientX - xPrec) * 0.008;
-    elevation = Math.max(0.2, Math.min(1.4, elevation + (e.clientY - yPrec) * 0.006));
-    xPrec = e.clientX; yPrec = e.clientY;
-    placerCamera();
-  });
-  // Zoom molette
+    vAngle += (x - xPrec) * 0.0022;
+    vElevation += (y - yPrec) * 0.0016;
+    xPrec = x; yPrec = y;
+  }
+
+  renderer.domElement.addEventListener('mousedown', e => debutGlisse(e.clientX, e.clientY));
+  window.addEventListener('mouseup', () => { glisse = false; });
+  window.addEventListener('mousemove', e => pendantGlisse(e.clientX, e.clientY));
+
+  /* Tactile : sans cela la maquette est inerte sur telephone, alors que c'est
+     la que l'application est le plus utilisee. */
+  let ecartPrec = null;
+  function distanceDoigts(e) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.hypot(dx, dy) || 1;
+  }
+  renderer.domElement.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) debutGlisse(e.touches[0].clientX, e.touches[0].clientY);
+    else if (e.touches.length === 2) ecartPrec = distanceDoigts(e);
+    dernierMouv = Date.now();
+  }, { passive: true });
+  renderer.domElement.addEventListener('touchmove', e => {
+    if (e.touches.length === 1) {
+      pendantGlisse(e.touches[0].clientX, e.touches[0].clientY);
+    } else if (e.touches.length === 2 && ecartPrec) {
+      const ecart = distanceDoigts(e);
+      distanceCible = borner(distanceCible * (ecartPrec / ecart), 400, 1800);
+      ecartPrec = ecart;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  renderer.domElement.addEventListener('touchend', () => { glisse = false; ecartPrec = null; });
+
   renderer.domElement.addEventListener('wheel', e => {
     e.preventDefault();
-    distance = Math.max(400, Math.min(1800, distance + e.deltaY * 0.6));
-    placerCamera();
+    distanceCible = borner(distanceCible + e.deltaY * 0.6, 400, 1800);
   }, { passive: false });
 
+  /* Survol : le bloc vise s'eclaircit. Sans ce retour, rien n'indique qu'un
+     batiment est cliquable. */
+  let survole = null;
+  renderer.domElement.addEventListener('mousemove', e => {
+    const r = renderer.domElement.getBoundingClientRect();
+    souris.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+    souris.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(souris, camera);
+    const hits = ray.intersectObjects(blocs);
+    const vise = hits.length ? hits[0].object : null;
+    if (vise !== survole) {
+      if (survole) survole.material.opacity = 0.38;
+      if (vise) vise.material.opacity = 0.62;
+      survole = vise;
+      renderer.domElement.style.cursor = vise ? 'pointer' : 'grab';
+    }
+  });
+
+  /* Etiquettes flottantes.
+     CSS2DRenderer n'est pas dans ce build de Three (r128) : plutot que d'ajouter
+     un fichier, on projette la position du toit a l'ecran et on y place un
+     simple <div>. */
+  const calque = document.createElement('div');
+  calque.className = 'm3d-etiquettes';
+  hote.appendChild(calque);
+  const etiquettes = blocs.map(function (bloc) {
+    const el = document.createElement('div');
+    el.className = 'm3d-etiquette';
+    el.innerHTML = '<b>' + bloc.userData.nom + '</b><span>'
+                 + pourcent(bloc.userData.pct) + '</span>';
+    calque.appendChild(el);
+    return { el: el, bloc: bloc };
+  });
+
+  const projete = new THREE.Vector3();
+  function placerEtiquettes() {
+    const l = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+
+    // 1. Projeter chaque etiquette et retenir sa profondeur.
+    const candidats = [];
+    etiquettes.forEach(function (t) {
+      // position.y vaut la moitie de la hauteur : on vise le toit, un peu au-dessus.
+      projete.set(t.bloc.position.x, t.bloc.position.y * 2 + 26, t.bloc.position.z);
+      projete.project(camera);
+      // z > 1 : le point est derriere la camera, l'etiquette se retrouverait
+      // projetee a l'oppose de l'ecran.
+      if (projete.z > 1) { t.el.style.display = 'none'; return; }
+      candidats.push({
+        el: t.el,
+        x: (projete.x + 1) / 2 * l,
+        y: (-projete.y + 1) / 2 * h,
+        profondeur: projete.z,
+      });
+    });
+
+    /* 2. Evitement de chevauchement.
+       Neuf batiments serres donnent, sous certains angles, un tas d'etiquettes
+       illisibles au centre de l'image. On place d'abord les plus proches de la
+       camera et on masque celles qui recouvriraient une deja posee : mieux vaut
+       une etiquette absente qu'un empilement ou plus rien ne se lit. */
+    candidats.sort(function (a, b) { return a.profondeur - b.profondeur; });
+    const posees = [];
+    candidats.forEach(function (c) {
+      const lg = c.el.offsetWidth || 90, ht = c.el.offsetHeight || 22;
+      // transform: translate(-50%, -100%) : le point projete est en bas au centre.
+      const boite = { g: c.x - lg / 2, d: c.x + lg / 2, ht: c.y - ht, b: c.y };
+      const chevauche = posees.some(function (q) {
+        return !(boite.d < q.g || boite.g > q.d || boite.b < q.ht || boite.ht > q.b);
+      });
+      if (chevauche) { c.el.style.display = 'none'; return; }
+      posees.push(boite);
+      c.el.style.display = 'block';
+      c.el.style.left = c.x + 'px';
+      c.el.style.top = c.y + 'px';
+    });
+  }
+
   // Clic sur un bloc → info
-  const ray = new THREE.Raycaster(), souris = new THREE.Vector2();
   renderer.domElement.addEventListener('click', e => {
     const r = renderer.domElement.getBoundingClientRect();
     souris.x = ((e.clientX - r.left) / r.width) * 2 - 1;
@@ -364,16 +516,29 @@ function construireMaquette3D() {
   });
 
   // Boucle de rendu
-  let dernierMouv = Date.now();
   renderer.domElement.addEventListener('mousedown', () => dernierMouv = Date.now());
   renderer.domElement.addEventListener('wheel', () => dernierMouv = Date.now());
+  renderer.domElement.style.cursor = 'grab';
+
   (function animer() {
     requestAnimationFrame(animer);
-    // Rotation douce automatique apres 3s d'inactivite
-    if (!glisse && Date.now() - dernierMouv > 3000) {
-      angle += 0.0015;
-      placerCamera();
-    }
+
+    // Inertie : le mouvement se prolonge puis s'eteint, au lieu de s'arreter net.
+    angle += vAngle;
+    elevation = borner(elevation + vElevation, 0.12, 1.35);
+    vAngle *= 0.90;
+    vElevation *= 0.90;
+    if (Math.abs(vAngle) < 1e-5) vAngle = 0;
+    if (Math.abs(vElevation) < 1e-5) vElevation = 0;
+
+    // Le zoom rejoint sa cible progressivement.
+    distance += (distanceCible - distance) * 0.12;
+
+    // Rotation douce automatique apres 3 s d'inactivite.
+    if (!glisse && vAngle === 0 && Date.now() - dernierMouv > 3000) angle += 0.0015;
+
+    placerCamera();
+    placerEtiquettes();
     renderer.render(scene, camera);
   })();
 
@@ -382,6 +547,7 @@ function construireMaquette3D() {
     const l = hote.clientWidth, h = hote.clientHeight;
     camera.aspect = l / h; camera.updateProjectionMatrix();
     renderer.setSize(l, h);
+    placerEtiquettes();
   });
 }
 </script>

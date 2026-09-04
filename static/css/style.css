@@ -1209,3 +1209,26 @@ body::before {
 .message-tete b { font-size: .82rem; color: var(--encre); }
 .message-tete small { color: var(--doux); font-size: .72rem; }
 .message p { margin: 4px 0 0; font-size: .88rem; white-space: pre-wrap; }
+
+/* ------------------------------------------- Etiquettes de la maquette 3D */
+/* Le calque ne doit pas intercepter la souris : la rotation se fait sur le
+   canevas qui se trouve dessous. */
+.m3d-etiquettes { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.m3d-etiquette {
+  position: absolute; transform: translate(-50%, -100%);
+  background: rgba(15, 23, 46, .82);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,.16); border-radius: 8px;
+  padding: 4px 9px; white-space: nowrap;
+  display: flex; align-items: baseline; gap: 7px;
+  font-size: .72rem; line-height: 1.3; color: #fff;
+  box-shadow: 0 4px 14px rgba(4,10,28,.35);
+}
+.m3d-etiquette b { font-weight: 650; }
+.m3d-etiquette span { color: var(--vert-40); font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) {
+  /* Ecran etroit : on garde le NOM, qui identifie le batiment. Un pourcentage
+     seul ne dirait pas de quoi il parle ; le detail reste accessible au tap. */
+  .m3d-etiquette { padding: 3px 7px; font-size: .66rem; }
+  .m3d-etiquette span { display: none; }
+}
