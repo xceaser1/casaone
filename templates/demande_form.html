@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block titre %}{{ 'Modifier la demande' if d else 'Nouvelle demande' }}{% endblock %}
+{% block sous_entete %}{% if d %}#{{ d.numero }} · {{ d.objet }}{% else %}Exprimer un besoin du chantier{% endif %}{% endblock %}
+
+{% block contenu %}
+<form method="post" class="carte" style="max-width:820px">
+  <div class="carte-corps">
+
+    <div class="champ">
+      <label for="objet">Objet de la demande</label>
+      <input id="objet" name="objet" required maxlength="160"
+             placeholder="Approvisionnement coffrage zone A3"
+             value="{{ d.objet if d else formulaire.get('objet','') }}">
+    </div>
+
+    <div class="grille-2" style="gap:14px">
+      <div class="champ">
+        <label for="localisation">Où ?</label>
+        <input id="localisation" name="localisation" maxlength="120" placeholder="Zone A3, niveau PHSS2"
+               value="{{ d.localisation or '' if d else formulaire.get('localisation','') }}">
+      </div>
+      <div class="champ">
+        <label for="besoin_pour">Pour le</label>
+        <input id="besoin_pour" name="besoin_pour" type="date"
+               value="{{ d.besoin_pour.isoformat() if d and d.besoin_pour else formulaire.get('besoin_pour','') }}">
+      </div>
+    </div>
+
+    <div class="champ">
+      <label for="urgence">Urgence</label>
+      <select id="urgence" name="urgence">
+        {% for code, libelle in urgences %}
+        <option value="{{ code }}" {{ 'selected' if (d.urgence if d else formulaire.get('urgence')) == code }}>{{ libelle }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <h4 style="margin:22px 0 8px;color:var(--encre)">Ce dont vous avez besoin</h4>
+    <p class="badges-info" style="margin-bottom:10px">
+      Choisissez un article du stock, ou décrivez librement un besoin qui n'y figure pas
+      (engin à louer, intervention, main-d'œuvre).
+    </p>
+
+    <div id="lignes"></div>
+    <button type="button" class="btn mini" onclick="ajouterLigne()">{{ ico('plus') }} Ajouter une ligne</button>
+
+    <div class="champ" style="margin-top:20px">
+      <label for="commentaire">Précisions</label>
+      <textarea id="commentaire" name="commentaire" rows="3"
+                placeholder="Accès, contraintes, contact sur place...">{{ d.commentaire or '' if d else formulaire.get('commentaire','') }}</textarea>
+    </div>
+  </div>
+
+  <div class="carte-tete" style="border-top:1px solid var(--bord);border-bottom:0;justify-content:flex-end;gap:10px">
+    <a class="btn" href="{{ url_for('demandes.detail', did=d.id) if d else url_for('demandes.index') }}">Annuler</a>
+    <button class="btn" type="submit">Enregistrer en brouillon</button>
+    {% if not d %}
+    <button class="btn btn-fonce" type="submit" name="soumettre" value="1">Enregistrer et soumettre</button>
+    {% endif %}
+  </div>
+</form>
+
+<template id="modele-ligne">
+  <div class="ligne-demande">
+    <select name="ligne_article" onchange="basculerLigne(this)">
+      <option value="">— besoin libre —</option>
+      {% for a in articles %}
+      <option value="{{ a.id }}" data-unite="{{ a.unite }}">{{ a.designation }}{% if a.code %} ({{ a.code }}){% endif %}</option>
+      {% endfor %}
+    </select>
+    <input name="ligne_libre" placeholder="Décrivez le besoin">
+    <input name="ligne_quantite" type="number" step="0.01" min="0" placeholder="Qté" style="max-width:96px">
+    <input name="ligne_unite" value="U" placeholder="Unité" style="max-width:80px">
+    <button type="button" class="btn mini btn-danger" onclick="this.closest('.ligne-demande').remove()">✕</button>
+  </div>
+</template>
+
+<style>
+  .ligne-demande { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  .ligne-demande select { flex:1 1 200px; min-width:0; }
+  .ligne-demande input[name="ligne_libre"] { flex:1 1 180px; min-width:0; }
+  .champ { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+  .champ label { font-size:.8rem; font-weight:600; color:var(--doux); }
+</style>
+
+<script>
+(function () {
+  const hote = document.getElementById('lignes');
+  const modele = document.getElementById('modele-ligne');
+
+  /* Une ligne désigne soit un article du catalogue, soit un besoin libre :
+     jamais les deux. On neutralise donc le champ qui ne s'applique pas, plutôt
+     que de laisser saisir une ligne ambiguë que le serveur refuserait. */
+  window.basculerLigne = function (select) {
+    const ligne = select.closest('.ligne-demande');
+    const libre = ligne.querySelector('input[name="ligne_libre"]');
+    const unite = ligne.querySelector('input[name="ligne_unite"]');
+    const choisi = select.options[select.selectedIndex];
+    const catalogue = !!select.value;
+
+    /* readonly et non disabled : un champ desactive n'est PAS envoye avec le
+       formulaire, ce qui desalignerait les listes paralleles (article[],
+       libre[], quantite[]) et melangerait les lignes entre elles. */
+    libre.readOnly = catalogue;
+    libre.value = catalogue ? '' : libre.value;
+    libre.placeholder = catalogue ? '—' : 'Décrivez le besoin';
+    libre.style.opacity = catalogue ? '.5' : '1';
+    if (catalogue && choisi.dataset.unite) unite.value = choisi.dataset.unite;
+  };
+
+  window.ajouterLigne = function (valeurs) {
+    const noeud = modele.content.cloneNode(true);
+    const ligne = noeud.querySelector('.ligne-demande');
+    if (valeurs) {
+      if (valeurs.article) ligne.querySelector('select').value = valeurs.article;
+      if (valeurs.libre) ligne.querySelector('input[name="ligne_libre"]').value = valeurs.libre;
+      ligne.querySelector('input[name="ligne_quantite"]').value = valeurs.quantite;
+      ligne.querySelector('input[name="ligne_unite"]').value = valeurs.unite;
+    }
+    hote.appendChild(noeud);
+    basculerLigne(hote.lastElementChild.querySelector('select'));
+  };
+
+  {% if d %}
+  {% for l in d.lignes %}
+  ajouterLigne({ article: {{ l.article_id or 'null' }},
+                 libre: {{ (l.designation_libre or '') | tojson }},
+                 quantite: {{ l.quantite }},
+                 unite: {{ l.unite | tojson }} });
+  {% endfor %}
+  {% else %}
+  ajouterLigne();
+  {% endif %}
+})();
+</script>
+{% endblock %}

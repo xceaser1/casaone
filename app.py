@@ -15,6 +15,7 @@ from models import engin as _engin_models  # noqa: F401  (enregistre la table en
 from models import metier as _metier_models  # noqa: F401
 from models import presence as _presence_models  # noqa: F401  (enregistre la table presences)
 from models import stock as _stock_models  # noqa: F401  (depots, articles, mouvements)
+from models import demande as _demande_models  # noqa: F401  (demandes d'approvisionnement)
 from models.projet import Projet
 
 login_manager = LoginManager()
@@ -50,6 +51,7 @@ def creer_app(config_class=Config):
     from routes.projet_routes import bp as projets_bp
     from routes.stock_routes import bp as stock_bp
     from routes.mobile_routes import bp as mobile_bp
+    from routes.demande_routes import bp as demandes_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(pages_bp)
@@ -59,6 +61,7 @@ def creer_app(config_class=Config):
     app.register_blueprint(pointage_bp)
     app.register_blueprint(stock_bp)
     app.register_blueprint(mobile_bp)
+    app.register_blueprint(demandes_bp)
 
     _enregistrer_contexte(app)
     _enregistrer_erreurs(app)
@@ -321,10 +324,24 @@ def _enregistrer_contexte(app):
                 projet_id=projet_actif.id, jour=date.today(), type="entree"
             ).count()
 
+        def demandes_a_traiter():
+            """Demandes en attente de decision, pour la pastille du menu.
+
+            Un simple COUNT sur un index existant, et zero des que
+            l'utilisateur n'a pas acces au module.
+            """
+            if projet_actif is None or not peut("demandes"):
+                return 0
+            from models.demande import Demande
+            return Demande.query.filter_by(
+                projet_id=projet_actif.id, statut="soumise"
+            ).count()
+
         return {
             "peut": peut,
             "statique": statique,
             "presents_aujourdhui": presents_aujourdhui,
+            "demandes_a_traiter": demandes_a_traiter,
             "projet_nom": projet_actif.nom if projet_actif else app.config["PROJET_NOM"],
             "societe": app.config["SOCIETE"],
             "projet_actif": projet_actif,

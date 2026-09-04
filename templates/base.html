@@ -137,12 +137,17 @@
         {% if peut('validation') %}{{ lien(url_for('pages.validation'), 'validation', page, 'Validation des plans', 'validation') }}{% endif %}
       {% endcall %}
 
-      {% if peut('stock') %}
-      {% call section('Stock', 'stock', ['stock','stock-mouvements']) %}
+      {% if peut('stock') or peut('demandes') %}
+      {% call section('Stock', 'stock', ['stock','stock-mouvements','demandes'], demandes_a_traiter()) %}
+        {% if peut('stock') %}
         {{ lien(url_for('stock.index'), 'stock', page, 'État du stock', 'dalles') }}
         <div class="sous-nav">
           {{ lien(url_for('stock.mouvements'), 'stock-mouvements', page, 'Journal des mouvements') }}
         </div>
+        {% endif %}
+        {% if peut('demandes') %}
+        {{ lien(url_for('demandes.index'), 'demandes', page, 'Demandes', 'livraisons') }}
+        {% endif %}
       {% endcall %}
       {% endif %}
 

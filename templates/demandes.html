@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block titre %}Demandes{% endblock %}
+{% block sous_entete %}Besoins du chantier — {{ projet_actif.nom if projet_actif else projet_nom }}{% endblock %}
+
+{% block contenu %}
+<div class="presences-barre">
+  <p class="badges-info">
+    Ce dont le chantier a besoin : un responsable valide, puis le fait servir —
+    ce qui écrit directement la sortie dans le journal de stock.
+  </p>
+  <div class="presences-actions">
+    {% if peut('demandes', 'create') %}
+    <a class="btn btn-fonce" href="{{ url_for('demandes.nouvelle') }}">{{ ico('plus') }} Nouvelle demande</a>
+    {% endif %}
+    <a class="btn" href="{{ url_for('stock.index') }}">État du stock</a>
+  </div>
+</div>
+
+<div class="grille-kpi">
+  <div class="kpi accent">
+    <span class="kpi-ic">{{ ico('validation') }}</span>
+    <div class="kpi-body">
+      <span class="lib">À traiter</span>
+      <div class="val">{{ compteurs.a_traiter }}</div>
+      <div class="note">en attente de décision</div>
+    </div>
+  </div>
+  <div class="kpi">
+    <span class="kpi-ic" style="background:#16a34a">{{ ico('livraisons') }}</span>
+    <div class="kpi-body">
+      <span class="lib">Validées</span>
+      <div class="val">{{ compteurs.validee }}</div>
+      <div class="note">à servir</div>
+    </div>
+  </div>
+  <div class="kpi">
+    <span class="kpi-ic" style="background:#7a5cd6">{{ ico('dalles') }}</span>
+    <div class="kpi-body">
+      <span class="lib">Servies</span>
+      <div class="val">{{ compteurs.servie }}</div>
+      <div class="note">sorties enregistrées</div>
+    </div>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="carte-tete">
+    <h3>Demandes</h3>
+    <span class="pres-compte">{{ lignes|length }} demande{{ 's' if lignes|length > 1 }}</span>
+  </div>
+
+  <form class="pres-filtres" method="get">
+    <input type="search" name="q" value="{{ args.get('q','') }}" placeholder="Objet, zone...">
+    <select name="statut" onchange="this.form.submit()">
+      <option value="">Tous les statuts</option>
+      {% for code, libelle in statuts %}
+      <option value="{{ code }}" {{ 'selected' if args.get('statut') == code }}>{{ libelle }}</option>
+      {% endfor %}
+    </select>
+    <select name="urgence" onchange="this.form.submit()">
+      <option value="">Toutes les urgences</option>
+      {% for code, libelle in urgences %}
+      <option value="{{ code }}" {{ 'selected' if args.get('urgence') == code }}>{{ libelle }}</option>
+      {% endfor %}
+    </select>
+    <select name="demandeur" onchange="this.form.submit()">
+      <option value="">Tous les demandeurs</option>
+      {% for d in filtres.demandeurs %}
+      <option value="{{ d }}" {{ 'selected' if args.get('demandeur') == d }}>{{ d }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn mini" type="submit">Filtrer</button>
+    <a class="btn mini" href="{{ url_for('demandes.index') }}">Réinitialiser</a>
+  </form>
+
+  <div class="pres-liste">
+    {% for d in lignes %}
+    <a class="pres-c" href="{{ url_for('demandes.detail', did=d.id) }}" style="text-decoration:none;color:inherit">
+      <span class="pres-av {{ 'sortie' if d.urgence == 'critique' }}"
+            {% if d.urgence == 'urgente' %}style="background:#fdf1dd;color:#e08a1e"{% endif %}>
+        #{{ d.numero }}
+      </span>
+      <div class="pres-info">
+        <b>{{ d.objet }}</b>
+        <small>
+          {{ d.demandeur or '—' }}
+          {% if d.localisation %} · {{ d.localisation }}{% endif %}
+          · {{ d.nb_lignes }} ligne{{ 's' if d.nb_lignes > 1 }}
+          {% if d.besoin_pour %} · pour le {{ d.besoin_pour.strftime('%d/%m') }}{% endif %}
+        </small>
+      </div>
+      <div class="pres-tps">
+        {% if d.en_retard %}<span class="badge-statut b-rouge">En retard</span>{% endif %}
+        {% if d.urgence != 'normale' %}
+        <span class="badge-statut {{ 'b-rouge' if d.urgence == 'critique' else 'b-ambre' }}">{{ d.urgence_libelle }}</span>
+        {% endif %}
+        <span class="badge-statut {{ d.statut_classe }}">{{ d.statut_libelle }}</span>
+      </div>
+    </a>
+    {% endfor %}
+    {% if not lignes %}
+    <div class="pres-vide">Aucune demande pour ces critères.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

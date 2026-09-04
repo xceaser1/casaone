@@ -31,6 +31,7 @@ MODULES = [
     ("engins", "Materiel et engins"),
     ("mainoeuvre", "Main-d'oeuvre"),
     ("stock", "Stock et depots"),
+    ("demandes", "Demandes d'approvisionnement"),
     ("pointage", "Pointage (badges QR)"),
     ("admin", "Administration"),
 ]
