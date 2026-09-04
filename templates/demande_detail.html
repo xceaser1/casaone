@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block titre %}Demande #{{ d.numero }}{% endblock %}
+{% block sous_entete %}{{ d.objet }}{% endblock %}
+
+{% block contenu %}
+<div class="presences-barre">
+  <p class="badges-info">
+    <span class="badge-statut {{ d.statut_classe }}">{{ d.statut_libelle }}</span>
+    {% if d.urgence != 'normale' %}
+    <span class="badge-statut {{ 'b-rouge' if d.urgence == 'critique' else 'b-ambre' }}">{{ d.urgence_libelle }}</span>
+    {% endif %}
+    {% if d.en_retard %}<span class="badge-statut b-rouge">En retard</span>{% endif %}
+  </p>
+  <div class="presences-actions">
+    <a class="btn" href="{{ url_for('demandes.index') }}">← Toutes les demandes</a>
+    {% if d.modifiable and peut('demandes', 'edit') %}
+    <a class="btn" href="{{ url_for('demandes.modifier', did=d.id) }}">Modifier</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grille-2" style="gap:16px;align-items:start">
+
+  <div class="carte">
+    <div class="carte-tete"><h3>Ce qui est demandé</h3></div>
+    <div class="pres-liste">
+      {% for l in d.lignes %}
+      <div class="pres-c">
+        <span class="pres-av">{{ '📦' if l.catalogue else '✎' }}</span>
+        <div class="pres-info">
+          <b>{{ l.libelle }}</b>
+          <small>
+            {% if l.catalogue %}article suivi en stock{% else %}besoin hors catalogue{% endif %}
+            {% if l.note %} · {{ l.note }}{% endif %}
+          </small>
+        </div>
+        <div class="pres-tps">
+          <span class="pres-h">
+            <b>{{ '%g'|format(l.quantite) }} {{ l.unite }}</b>
+            {% if d.statut == 'servie' %}
+            <b style="color:var(--doux);font-weight:500">servi : {{ '%g'|format(l.quantite_servie or 0) }}</b>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="carte">
+    <div class="carte-tete"><h3>Suivi</h3></div>
+    <div class="carte-corps">
+      <div class="fiche-l"><span>Demandeur</span><b>{{ d.demandeur or '—' }}</b></div>
+      <div class="fiche-l"><span>Créée le</span><b>{{ d.cree_le.strftime('%d/%m/%Y %H:%M') if d.cree_le }}</b></div>
+      {% if d.localisation %}<div class="fiche-l"><span>Où</span><b>{{ d.localisation }}</b></div>{% endif %}
+      {% if d.besoin_pour %}<div class="fiche-l"><span>Pour le</span><b>{{ d.besoin_pour.strftime('%d/%m/%Y') }}</b></div>{% endif %}
+      {% if d.decide_par %}
+      <div class="fiche-l"><span>{{ 'Validée par' if d.statut != 'refusee' else 'Refusée par' }}</span><b>{{ d.decide_par }}</b></div>
+      <div class="fiche-l"><span>Le</span><b>{{ d.decide_le.strftime('%d/%m/%Y %H:%M') if d.decide_le }}</b></div>
+      {% endif %}
+      {% if d.motif_decision %}
+      <div class="fiche-l"><span>Motif</span><b>{{ d.motif_decision }}</b></div>
+      {% endif %}
+      {% if d.servie_par %}
+      <div class="fiche-l"><span>Servie par</span><b>{{ d.servie_par }}</b></div>
+      <div class="fiche-l"><span>Depuis</span><b>{{ d.depot.code if d.depot else '—' }}</b></div>
+      {% endif %}
+      {% if d.commentaire %}
+      <p style="margin-top:12px;color:var(--doux);font-size:.88rem">{{ d.commentaire }}</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ------------------------------------------------------------ Actions #}
+{% if d.statut in ('brouillon', 'soumise', 'validee') %}
+<div class="carte" style="margin-top:16px">
+  <div class="carte-tete"><h3>Que faire ensuite ?</h3></div>
+  <div class="carte-corps">
+
+    {% if d.statut == 'brouillon' %}
+    <form method="post" action="{{ url_for('demandes.statut', did=d.id) }}">
+      <input type="hidden" name="vers" value="soumise">
+      <p class="badges-info">Cette demande est encore un brouillon : personne ne l'a reçue.</p>
+      <button class="btn btn-fonce" type="submit">Soumettre pour validation</button>
+    </form>
+
+    {% elif d.statut == 'soumise' %}
+      {% if peut('demandes', 'edit') %}
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">
+        <form method="post" action="{{ url_for('demandes.statut', did=d.id) }}">
+          <input type="hidden" name="vers" value="validee">
+          <button class="btn btn-vert" type="submit">Valider</button>
+        </form>
+        <form method="post" action="{{ url_for('demandes.statut', did=d.id) }}"
+              style="display:flex;gap:8px;flex:1 1 320px">
+          <input type="hidden" name="vers" value="refusee">
+          <input name="motif" placeholder="Motif du refus (obligatoire)" required style="flex:1">
+          <button class="btn btn-danger" type="submit">Refuser</button>
+        </form>
+      </div>
+      {% else %}
+      <p class="badges-info">En attente d'une décision d'un responsable.</p>
+      {% endif %}
+
+    {% elif d.statut == 'validee' %}
+      {% if peut('demandes', 'edit') and peut('stock', 'create') %}
+      <form method="post" action="{{ url_for('demandes.servir', did=d.id) }}">
+        <p class="badges-info">
+          Servir enregistre une <b>sortie de stock</b> pour chaque ligne cataloguée.
+          Les besoins hors catalogue sont marqués servis sans mouvement.
+        </p>
+        <div class="champ" style="max-width:340px">
+          <label for="depot_id">Dépôt qui fournit</label>
+          <select id="depot_id" name="depot_id" required>
+            <option value="">Choisir un dépôt…</option>
+            {% for dep in depots %}
+            <option value="{{ dep.id }}">{{ dep.code }} — {{ dep.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <table class="tbl" style="margin:12px 0">
+          <thead><tr><th>Article</th><th>Demandé</th><th>Réellement remis</th></tr></thead>
+          <tbody>
+            {% for l in d.lignes %}
+            <tr>
+              <td>{{ l.libelle }}{% if not l.catalogue %} <small style="color:var(--doux)">(hors stock)</small>{% endif %}</td>
+              <td>{{ '%g'|format(l.quantite) }} {{ l.unite }}</td>
+              <td><input name="servi_{{ l.id }}" type="number" step="0.01" min="0"
+                         value="{{ '%g'|format(l.quantite) }}" style="max-width:110px"></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button class="btn btn-fonce" type="submit">Marquer servie et sortir du stock</button>
+      </form>
+      {% else %}
+      <p class="badges-info">Validée. En attente du magasinier pour être servie.</p>
+      {% endif %}
+    {% endif %}
+
+    {% if d.statut != 'servie' and peut('demandes', 'delete') %}
+    <form method="post" action="{{ url_for('demandes.supprimer', did=d.id) }}"
+          onsubmit="return confirmerSuppression('Supprimer la demande #{{ d.numero }} ?')"
+          style="margin-top:18px;border-top:1px solid var(--bord);padding-top:14px">
+      <button class="btn mini btn-danger" type="submit">Supprimer cette demande</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

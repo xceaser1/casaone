@@ -769,6 +769,7 @@ input[type=range]::-moz-range-thumb {
 .badge-statut.b-bleu { background: var(--bleu-10); color: var(--bleu); }
 .badge-statut.b-ambre { background: var(--ambre-10); color: var(--ambre); }
 .badge-statut.b-gris { background: #eceff0; color: var(--doux); }
+.badge-statut.b-rouge { background: var(--rouge-10); color: var(--rouge); }
 .projet-avancement { margin-bottom: 16px; }
 .projet-avancement-tete { display: flex; justify-content: space-between; font-size: .82rem; margin-bottom: 3px; }
 .projet-avancement-tete span { color: var(--doux); }
@@ -1173,3 +1174,16 @@ body::before {
     box-shadow: 0 8px 22px rgba(4,10,28,.4);
   }
 }
+
+/* ------------------------------------------ Fiche de suivi (clé / valeur) */
+/* Utilise par le detail d'une demande. La classe existait dans le gabarit du
+   scanner uniquement : hors de cette page, les libelles se collaient a leur
+   valeur. */
+.fiche-l {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+  padding: 7px 0; border-bottom: 1px solid var(--bord);
+  font-size: .88rem;
+}
+.fiche-l:last-child { border-bottom: 0; }
+.fiche-l > span { color: var(--doux); flex: 0 0 auto; }
+.fiche-l > b { color: var(--encre); font-weight: 600; text-align: right; min-width: 0; }
