@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Nom de l'application : c'est le systeme complet, pas un outil de scan. -->
+    <string name="app_name">CASA ONE</string>
+    <string name="widget_nom">Avancement du chantier</string>
+
+    <string name="rc_scan">Scanner</string>
+    <string name="rc_scan_long">Scanner un badge</string>
+    <string name="rc_presences">Présences</string>
+    <string name="rc_presences_long">Présences du jour</string>
+    <string name="rc_stock">Stock</string>
+    <string name="rc_stock_long">État du stock</string>
+</resources>

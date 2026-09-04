@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#000000">
+
+    <androidx.camera.view.PreviewView android:id="@+id/apercu"
+        android:layout_width="match_parent" android:layout_height="match_parent"/>
+
+    <!-- Cadre de visee : indique ou presenter le badge -->
+    <View android:layout_width="240dp" android:layout_height="240dp"
+        android:layout_gravity="center" android:background="@drawable/cadre_visee"/>
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal|bottom" android:layout_marginBottom="72dp"
+        android:text="Présentez le badge dans le cadre"
+        android:textColor="#FFFFFF" android:textSize="15sp"
+        android:shadowColor="#000000" android:shadowRadius="6"/>
+
+    <Button android:id="@+id/fermer"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="top|start" android:layout_margin="16dp"
+        android:text="Fermer" android:textColor="#FFFFFF"
+        android:background="#66000000"/>
+</FrameLayout>

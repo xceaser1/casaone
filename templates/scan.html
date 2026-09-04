@@ -347,6 +347,25 @@
   }
 
   function extraireToken(x) { var i = x.indexOf('/p/'); return i >= 0 ? x.slice(i + 3).split(/[?#]/)[0] : x; }
+
+  /* --------------------------------------------- Scanner natif (application)
+     Dans l'application Android, la lecture est confiee a ML Kit : nettement
+     plus rapide et bien plus tolerant en basse lumiere ou sur badge abime que
+     jsQR. Le natif ne fait que decoder ; toute la logique (sens du pointage,
+     file d'attente, affichage) reste ici, donc identique au navigateur. */
+  var natif = window.CasaOneNatif && window.CasaOneNatif.scannerDisponible
+              && window.CasaOneNatif.scannerDisponible();
+
+  window.casaoneBadgeLu = function (texte) {
+    if (texte) traiter(String(texte).trim());
+    // Enchaine : le pointeur scanne des dizaines de badges a la suite.
+    if (natif) setTimeout(ouvrirScannerNatif, 350);
+  };
+
+  function ouvrirScannerNatif() {
+    try { window.CasaOneNatif.scanner('casaoneBadgeLu'); }
+    catch (e) { natif = false; demarrer(); }
+  }
   function traiter(x) {
     var token = extraireToken(x), t = Date.now();
     if (recents[token] && t - recents[token] < 3000) return;
@@ -363,6 +382,13 @@
     requestAnimationFrame(boucle);
   }
   async function demarrer() {
+    if (natif) {
+      etat.textContent = 'Scanner natif — appuyez pour viser un badge';
+      var bouton = document.querySelector('.pill .centre');
+      if (bouton) bouton.addEventListener('click', ouvrirScannerNatif);
+      ouvrirScannerNatif();
+      return;
+    }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       etat.innerHTML = 'Caméra indisponible — ouvrez en <b>HTTPS</b> ou utilisez la saisie manuelle.'; return;
     }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Palette alignee sur l'interface web (bleu tableau de bord) -->
+    <color name="ic_launcher_background">#1B2340</color>
+    <color name="vert">#3B82F6</color>
+    <color name="vert_fonce">#1D4ED8</color>
+    <color name="vert_sombre">#1B2340</color>
+    <color name="fond">#ECEFF5</color>
+    <color name="doux">#6B7280</color>
+    <color name="blanc">#FFFFFF</color>
+    <color name="bord">#E6E8F0</color>
+</resources>

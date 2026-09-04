@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Le serveur de chantier presente un certificat auto-signe et peut etre joint
+  en clair sur le reseau local. On l'autorise, mais on garde les certificats
+  utilisateur (necessaires au certificat auto-signe) sous controle explicite.
+
+  Pour durcir : passer cleartextTrafficPermitted a "false" une fois que tous
+  les acces passent par HTTPS (Render ou Tailscale). Le code Java, lui, ne
+  contourne deja la verification du certificat que pour les adresses privees
+  (voir Reseau.adressePrivee) : une erreur de certificat sur un domaine public
+  reste bloquante.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

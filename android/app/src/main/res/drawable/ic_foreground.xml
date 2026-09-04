@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Coins du viseur de scan -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="4"
+        android:fillColor="#00000000" android:strokeLineCap="round"
+        android:pathData="M40,34 h-6 v6 M74,40 v-6 h-6 M40,74 h-6 v-6 M68,74 h6 v-6"/>
+    <!-- Motif QR stylise au centre -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M44,44 h8 v8 h-8 z M56,44 h8 v8 h-8 z M44,56 h8 v8 h-8 z M58,58 h6 v6 h-6 z"/>
+</vector>
