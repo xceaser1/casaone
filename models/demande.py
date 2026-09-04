@@ -33,6 +33,20 @@ URGENCES = (
     ("critique", "Critique"),
 )
 
+# Nature du besoin. Un chantier ne demande pas que des fournitures : il lui
+# manque aussi des engins, des bras, une intervention. Les distinguer permet de
+# router la demande vers le bon interlocuteur et de filtrer utilement.
+TYPES_BESOIN = (
+    ("materiel", "Materiel"),
+    ("engin", "Engin"),
+    ("mainoeuvre", "Main-d'oeuvre"),
+    ("autre", "Autre"),
+)
+
+# Pieces jointes : ce qu'un telephone de chantier produit naturellement.
+EXTENSIONS_JOINTES = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".pdf"}
+TAILLE_MAX_JOINTE = 8 * 1024 * 1024   # 8 Mo par fichier
+
 # Statuts depuis lesquels une demande peut encore etre modifiee par son auteur.
 MODIFIABLES = ("brouillon", "soumise")
 
@@ -50,6 +64,7 @@ class Demande(db.Model):
     numero = db.Column(db.Integer, nullable=False, index=True)
 
     objet = db.Column(db.String(160), nullable=False)
+    type_besoin = db.Column(db.String(16), default="materiel", nullable=False, index=True)
     localisation = db.Column(db.String(120))          # zone, bloc, niveau...
     urgence = db.Column(db.String(12), default="normale", nullable=False, index=True)
     besoin_pour = db.Column(db.Date)                  # date souhaitee
@@ -76,6 +91,14 @@ class Demande(db.Model):
         order_by="LigneDemande.id",
     )
     depot = db.relationship("Depot", lazy="joined")
+    pieces = db.relationship(
+        "PieceJointe", back_populates="demande",
+        cascade="all, delete-orphan", lazy="selectin", order_by="PieceJointe.id",
+    )
+    messages = db.relationship(
+        "MessageDemande", back_populates="demande",
+        cascade="all, delete-orphan", lazy="selectin", order_by="MessageDemande.cree_le",
+    )
 
     __table_args__ = (
         db.UniqueConstraint("projet_id", "numero", name="uq_demande_projet_numero"),
@@ -89,6 +112,16 @@ class Demande(db.Model):
     @property
     def urgence_libelle(self):
         return dict(URGENCES).get(self.urgence, self.urgence)
+
+    @property
+    def type_libelle(self):
+        return dict(TYPES_BESOIN).get(self.type_besoin, self.type_besoin)
+
+    @property
+    def type_icone(self):
+        """Icone du referentiel `ico()`, choisie pour parler au chantier."""
+        return {"materiel": "dalles", "engin": "engins",
+                "mainoeuvre": "mainoeuvre"}.get(self.type_besoin, "livraisons")
 
     @property
     def statut_classe(self):
@@ -166,3 +199,70 @@ class LigneDemande(db.Model):
 
     def __repr__(self):
         return f"<LigneDemande {self.libelle} x{self.quantite}>"
+
+
+class PieceJointe(db.Model):
+    """Photo ou PDF rattache a une demande.
+
+    Sur un chantier, une photo vaut souvent mieux qu'une description : elle
+    montre la piece cassee, l'acces, la reference illisible sur l'etiquette.
+
+    Le fichier est stocke hors de /static et servi par une route qui verifie
+    les droits : depose sous static/, il serait accessible a qui connait son
+    URL, sans authentification.
+    """
+
+    __tablename__ = "pieces_demande"
+
+    id = db.Column(db.Integer, primary_key=True)
+    demande_id = db.Column(db.Integer, db.ForeignKey("demandes.id", ondelete="CASCADE"),
+                           nullable=False, index=True)
+    # Nom d'origine, montre a l'utilisateur.
+    nom = db.Column(db.String(255), nullable=False)
+    # Nom sur le disque : genere, jamais celui fourni par l'utilisateur.
+    fichier = db.Column(db.String(255), nullable=False)
+    type_mime = db.Column(db.String(80))
+    taille = db.Column(db.Integer, default=0)
+    ajoute_par = db.Column(db.String(64))
+    cree_le = db.Column(db.DateTime, default=datetime.utcnow)
+
+    demande = db.relationship("Demande", back_populates="pieces")
+
+    @property
+    def est_image(self):
+        return (self.type_mime or "").startswith("image/")
+
+    @property
+    def taille_lisible(self):
+        octets = self.taille or 0
+        if octets < 1024:
+            return f"{octets} o"
+        if octets < 1024 * 1024:
+            return f"{octets / 1024:.0f} Ko"
+        return f"{octets / (1024 * 1024):.1f} Mo"
+
+    def __repr__(self):
+        return f"<PieceJointe {self.nom}>"
+
+
+class MessageDemande(db.Model):
+    """Echange autour d'une demande.
+
+    Un refus ou une question doit pouvoir etre discute sans creer une nouvelle
+    demande : « tu as quelle reference exactement ? », « livre demain matin ».
+    Sans cela, la conversation repart sur WhatsApp et se perd.
+    """
+
+    __tablename__ = "messages_demande"
+
+    id = db.Column(db.Integer, primary_key=True)
+    demande_id = db.Column(db.Integer, db.ForeignKey("demandes.id", ondelete="CASCADE"),
+                           nullable=False, index=True)
+    auteur = db.Column(db.String(64), nullable=False)
+    texte = db.Column(db.Text, nullable=False)
+    cree_le = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    demande = db.relationship("Demande", back_populates="messages")
+
+    def __repr__(self):
+        return f"<MessageDemande {self.auteur}>"

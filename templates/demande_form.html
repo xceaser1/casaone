@@ -26,13 +26,23 @@
       </div>
     </div>
 
-    <div class="champ">
-      <label for="urgence">Urgence</label>
+    <div class="grille-2" style="gap:14px">
+      <div class="champ">
+        <label for="type_besoin">Nature du besoin</label>
+        <select id="type_besoin" name="type_besoin">
+          {% for code, libelle in types_besoin %}
+          <option value="{{ code }}" {{ 'selected' if (d.type_besoin if d else formulaire.get('type_besoin','materiel')) == code }}>{{ libelle }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="champ">
+        <label for="urgence">Urgence</label>
       <select id="urgence" name="urgence">
         {% for code, libelle in urgences %}
         <option value="{{ code }}" {{ 'selected' if (d.urgence if d else formulaire.get('urgence')) == code }}>{{ libelle }}</option>
         {% endfor %}
-      </select>
+        </select>
+      </div>
     </div>
 
     <h4 style="margin:22px 0 8px;color:var(--encre)">Ce dont vous avez besoin</h4>

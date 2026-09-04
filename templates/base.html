@@ -113,12 +113,25 @@
     </div>
     <div class="nav-intitule">Menu</div>
     <nav class="nav">
-      {# Acces directs : toujours visibles, hors sections #}
+      {# Acces directs. Demandes y figure a part : c'est le point d'entree
+         quotidien des equipes de terrain, pas une annexe du stock. #}
       {% if peut('projets') %}{{ lien(url_for('projets.index'), 'projets', page, 'Projets', 'projets') }}{% endif %}
       {% if peut('dashboard') %}{{ lien(url_for('pages.dashboard'), 'dashboard', page, 'Dashboard', 'dashboard') }}{% endif %}
+      {% if peut('demandes') %}
+      <a href="{{ url_for('demandes.index') }}" class="{{ 'actif' if page == 'demandes' }}"
+         data-libelle="Demandes">
+        {{ ico('livraisons') }}<span>Demandes</span>
+        {% set a_traiter = demandes_a_traiter() %}
+        {% if a_traiter %}<span class="nav-badge" title="{{ a_traiter }} en attente de décision">{{ a_traiter }}</span>{% endif %}
+      </a>
+      {% endif %}
 
-      {% call section('Suivi de production', 'production',
-          ['plan','surfaces','betonnage','livraisons','livraisons-registre','engins','engins-registre','validation']) %}
+      {# Sections regroupees par activite plutot que par ecran : l'ancienne
+         organisation eclatait Dalles et Diagrammes, qui relevent tous deux du
+         suivi de production, en sections separees de meme niveau. #}
+      {% call section('Production', 'production',
+          ['plan','surfaces','betonnage','livraisons','livraisons-registre','validation',
+           'dalles','dalles-reticulee','dalles-pleine','dalles-post-tension','dalles-hourdis']) %}
         {% if peut('surfaces') %}{{ lien(url_for('pages.plan_interactif'), 'plan', page, 'Plan du projet', 'plan') }}{% endif %}
         {% if peut('surfaces') %}{{ lien(url_for('pages.surfaces'), 'surfaces', page, 'Tableau de surfaces', 'surfaces') }}{% endif %}
         {% if peut('betonnage') %}{{ lien(url_for('pages.betonnage'), 'betonnage', page, 'Betonnage mensuelle', 'betonnage') }}{% endif %}
@@ -128,61 +141,42 @@
           {{ lien(url_for('pages.livraisons_registre'), 'livraisons-registre', page, 'Journal des livraisons') }}
         </div>
         {% endif %}
-        {% if peut('engins') %}
-        {{ lien(url_for('pages.engins'), 'engins', page, 'Matériel & engins', 'engins') }}
-        <div class="sous-nav">
-          {{ lien(url_for('pages.engins_registre'), 'engins-registre', page, 'Parc matériel') }}
-        </div>
-        {% endif %}
-        {% if peut('validation') %}{{ lien(url_for('pages.validation'), 'validation', page, 'Validation des plans', 'validation') }}{% endif %}
-      {% endcall %}
-
-      {% if peut('stock') or peut('demandes') %}
-      {% call section('Stock', 'stock', ['stock','stock-mouvements','demandes'], demandes_a_traiter()) %}
-        {% if peut('stock') %}
-        {{ lien(url_for('stock.index'), 'stock', page, 'État du stock', 'dalles') }}
-        <div class="sous-nav">
-          {{ lien(url_for('stock.mouvements'), 'stock-mouvements', page, 'Journal des mouvements') }}
-        </div>
-        {% endif %}
-        {% if peut('demandes') %}
-        {{ lien(url_for('demandes.index'), 'demandes', page, 'Demandes', 'livraisons') }}
-        {% endif %}
-      {% endcall %}
-      {% endif %}
-
-      {% if peut('dalles') %}
-      {% call section('Dalles', 'dalles',
-          ['dalles','dalles-reticulee','dalles-pleine','dalles-post-tension','dalles-hourdis']) %}
-        {{ lien(url_for('pages.dalles'), 'dalles', page, 'Tous les types', 'dalles') }}
+        {% if peut('dalles') %}
+        {{ lien(url_for('pages.dalles'), 'dalles', page, 'Dalles', 'dalles') }}
         <div class="sous-nav">
           {{ lien(url_for('pages.dalles', slug='reticulee'), 'dalles-reticulee', page, 'Dalle réticulée') }}
           {{ lien(url_for('pages.dalles', slug='pleine'), 'dalles-pleine', page, 'Dalle pleine') }}
           {{ lien(url_for('pages.dalles', slug='post-tension'), 'dalles-post-tension', page, 'Dalle post-tension') }}
           {{ lien(url_for('pages.dalles', slug='hourdis'), 'dalles-hourdis', page, 'Dalle hourdis') }}
         </div>
+        {% endif %}
+        {% if peut('validation') %}{{ lien(url_for('pages.validation'), 'validation', page, 'Validation des plans', 'validation') }}{% endif %}
+      {% endcall %}
+
+      {% if peut('stock') %}
+      {% call section('Stock', 'stock', ['stock','stock-mouvements']) %}
+        {{ lien(url_for('stock.index'), 'stock', page, 'État du stock', 'dalles') }}
+        <div class="sous-nav">
+          {{ lien(url_for('stock.mouvements'), 'stock-mouvements', page, 'Journal des mouvements') }}
+        </div>
       {% endcall %}
       {% endif %}
 
-      {% if peut('diagrammes') %}
-      {% call section('Diagrammes', 'diagrammes', ['diag-type','diag-niveau']) %}
-        {{ lien(url_for('pages.diagrammes', axe='type'), 'diag-type', page, 'Par type', 'diagrammes') }}
-        {{ lien(url_for('pages.diagrammes', axe='niveau'), 'diag-niveau', page, 'Par niveau', 'diagrammes') }}
-      {% endcall %}
-      {% endif %}
-
-      {% if peut('couts') %}
-      {% call section('Finances', 'finances', ['couts']) %}
-        {{ lien(url_for('pages.couts'), 'couts', page, 'Suivi des coûts', 'couts') }}
-      {% endcall %}
-      {% endif %}
-
-      {% if peut('mainoeuvre') %}
-      {% call section('Ressources', 'ressources', ['mainoeuvre','mainoeuvre-registre']) %}
+      {% if peut('engins') or peut('mainoeuvre') %}
+      {% call section('Moyens', 'moyens',
+          ['engins','engins-registre','mainoeuvre','mainoeuvre-registre']) %}
+        {% if peut('engins') %}
+        {{ lien(url_for('pages.engins'), 'engins', page, 'Matériel & engins', 'engins') }}
+        <div class="sous-nav">
+          {{ lien(url_for('pages.engins_registre'), 'engins-registre', page, 'Parc matériel') }}
+        </div>
+        {% endif %}
+        {% if peut('mainoeuvre') %}
         {{ lien(url_for('pages.mainoeuvre'), 'mainoeuvre', page, "Main-d'œuvre", 'mainoeuvre') }}
         <div class="sous-nav">
           {{ lien(url_for('pages.mainoeuvre_registre'), 'mainoeuvre-registre', page, 'Registre des ouvriers') }}
         </div>
+        {% endif %}
       {% endcall %}
       {% endif %}
 
@@ -191,6 +185,16 @@
         {{ lien(url_for('pointage.presences'), 'presences', page, 'Présences du jour', 'presence') }}
         {{ lien(url_for('pointage.scan'), 'scan', page, 'Scanner (mobile)', 'scan') }}
         {{ lien(url_for('pointage.liste_badges'), 'badges', page, 'Badges QR', 'qr') }}
+      {% endcall %}
+      {% endif %}
+
+      {% if peut('diagrammes') or peut('couts') %}
+      {% call section('Analyse', 'analyse', ['diag-type','diag-niveau','couts']) %}
+        {% if peut('diagrammes') %}
+        {{ lien(url_for('pages.diagrammes', axe='type'), 'diag-type', page, 'Diagrammes par type', 'diagrammes') }}
+        {{ lien(url_for('pages.diagrammes', axe='niveau'), 'diag-niveau', page, 'Diagrammes par niveau', 'diagrammes') }}
+        {% endif %}
+        {% if peut('couts') %}{{ lien(url_for('pages.couts'), 'couts', page, 'Suivi des coûts', 'couts') }}{% endif %}
       {% endcall %}
       {% endif %}
 

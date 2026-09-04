@@ -73,6 +73,7 @@ def creer_app(config_class=Config):
     with app.app_context():
         db.create_all()
         migrer_schema_projets()
+        migrer_colonnes_ajoutees()
         initialiser_referentiel_droits()
         initialiser_projet_principal(app)
 
@@ -160,6 +161,37 @@ def initialiser_projet_principal(app):
     )
     db.session.add(projet)
     db.session.commit()
+
+
+def migrer_colonnes_ajoutees():
+    """Ajoute les colonnes apparues apres la creation d'une table.
+
+    db.create_all() cree les tables manquantes mais ne touche jamais a une
+    table existante : une colonne ajoutee a un modele deja deploye resterait
+    absente en base, et chaque requete echouerait sur « no such column ».
+
+    Volontairement minimal : une liste (table, colonne, definition) et un
+    ALTER idempotent. Une vraie chaine de migrations (Alembic) serait plus
+    lourde que ce que ce projet demande aujourd'hui.
+    """
+    from sqlalchemy import text
+
+    # (table, colonne, definition SQL) — compatible SQLite et PostgreSQL.
+    ajouts = [
+        ("demandes", "type_besoin", "VARCHAR(16) DEFAULT 'materiel'"),
+    ]
+
+    inspecteur = db.inspect(db.engine)
+    tables = set(inspecteur.get_table_names())
+    with db.engine.begin() as conn:
+        for table, colonne, definition in ajouts:
+            if table not in tables:
+                continue    # create_all l'aura creee au bon schema
+            existantes = {c["name"] for c in inspecteur.get_columns(table)}
+            if colonne in existantes:
+                continue
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {colonne} {definition}"))
+            print(f"  migration : {table}.{colonne} ajoutee")
 
 
 def migrer_schema_projets():

@@ -57,6 +57,12 @@
       <option value="{{ code }}" {{ 'selected' if args.get('statut') == code }}>{{ libelle }}</option>
       {% endfor %}
     </select>
+    <select name="type" onchange="this.form.submit()">
+      <option value="">Tous les besoins</option>
+      {% for code, libelle in types_besoin %}
+      <option value="{{ code }}" {{ 'selected' if args.get('type') == code }}>{{ libelle }}</option>
+      {% endfor %}
+    </select>
     <select name="urgence" onchange="this.form.submit()">
       <option value="">Toutes les urgences</option>
       {% for code, libelle in urgences %}
@@ -83,7 +89,7 @@
       <div class="pres-info">
         <b>{{ d.objet }}</b>
         <small>
-          {{ d.demandeur or '—' }}
+          {{ d.type_libelle }} · {{ d.demandeur or '—' }}
           {% if d.localisation %} · {{ d.localisation }}{% endif %}
           · {{ d.nb_lignes }} ligne{{ 's' if d.nb_lignes > 1 }}
           {% if d.besoin_pour %} · pour le {{ d.besoin_pour.strftime('%d/%m') }}{% endif %}

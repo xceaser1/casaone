@@ -47,10 +47,16 @@ def _jour(valeur):
 def index():
     pid = projet_actif_id()
     depots, lignes, alertes = svc.tableau(pid)
+    # Categories reellement presentes : un filtre ne doit proposer que des
+    # valeurs qui donnent un resultat.
+    categories = sorted({
+        (l["article"].categorie or "").strip()
+        for l in lignes if (l["article"].categorie or "").strip()
+    })
     return render_template(
         "stock.html", page="stock", depots=depots, lignes=lignes,
         alertes=alertes, filtres=svc.valeurs_filtres(pid), types=TYPES,
-        aujourdhui=date.today(),
+        categories=categories, aujourdhui=date.today(),
     )
 
 

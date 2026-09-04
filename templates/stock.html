@@ -73,9 +73,22 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="stock-q" type="search" placeholder="Rechercher un article…" autocomplete="off">
     </div>
+    <select id="stock-categorie">
+      <option value="">Toutes les catégories</option>
+      {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+    </select>
+    <select id="stock-depot">
+      <option value="">Tous les dépôts</option>
+      {% for d in depots %}<option value="{{ d.id }}">{{ d.code }} — {{ d.nom }}</option>{% endfor %}
+    </select>
     <label style="display:flex;align-items:center;gap:7px;font-size:.85rem;color:var(--doux)">
       <input type="checkbox" id="stock-alerte" style="width:auto"> Sous le seuil seulement
     </label>
+    <label style="display:flex;align-items:center;gap:7px;font-size:.85rem;color:var(--doux)">
+      <input type="checkbox" id="stock-nonvide" style="width:auto"> Avec du stock
+    </label>
+    <button class="btn mini" type="button" id="stock-reset">Réinitialiser</button>
+    <span class="pres-compte" id="stock-compte"></span>
   </div>
 
   <div class="tableau-enveloppe">
@@ -83,13 +96,16 @@
       <thead>
         <tr>
           <th>Article</th>
-          {% for d in depots %}<th class="num" title="{{ d.nom }}">{{ d.code }}</th>{% endfor %}
+          {% for d in depots %}<th class="num col-depot" data-depot="{{ d.id }}" title="{{ d.nom }}">{{ d.code }}</th>{% endfor %}
           <th class="num">Total</th>
         </tr>
       </thead>
       <tbody>
         {% for l in lignes %}
         <tr data-alerte="{{ 1 if l.alerte else 0 }}"
+            data-categorie="{{ l.article.categorie or '' }}"
+            data-total="{{ l.total }}"
+            data-depots="{% for d in depots %}{{ d.id }}:{{ l.detail.get(d.id, 0) }}{{ ' ' if not loop.last }}{% endfor %}"
             data-recherche="{{ ((l.article.code or '') ~ ' ' ~ l.article.designation ~ ' ' ~ (l.article.categorie or '')) | lower }}">
           <td>
             <b>{{ l.article.designation }}</b>
@@ -98,7 +114,7 @@
             </span>
           </td>
           {% for d in depots %}
-          <td class="num">{{ '%g'|format(l.detail.get(d.id, 0)) }}</td>
+          <td class="num col-depot" data-depot="{{ d.id }}">{{ '%g'|format(l.detail.get(d.id, 0)) }}</td>
           {% endfor %}
           <td class="num">
             <b>{{ '%g'|format(l.total) }}</b> <span style="color:var(--doux)">{{ l.article.unite }}</span>
@@ -264,22 +280,64 @@ document.querySelectorAll('#mvt-type button').forEach(b => b.addEventListener('c
   document.querySelector('#ch-source select').required = !entree;
 }));
 
-/* Filtres du tableau de stock : recherche + articles sous le seuil. */
+/* Filtres du tableau de stock.
+   Le filtrage est fait dans la page : le tableau tient en memoire et le
+   chantier a souvent un reseau mediocre — un aller-retour serveur a chaque
+   frappe serait penible. */
 (function () {
   const q = document.getElementById('stock-q');
+  const categorie = document.getElementById('stock-categorie');
+  const depot = document.getElementById('stock-depot');
   const alerte = document.getElementById('stock-alerte');
+  const nonvide = document.getElementById('stock-nonvide');
+  const reset = document.getElementById('stock-reset');
+  const compte = document.getElementById('stock-compte');
   const lignes = Array.from(document.querySelectorAll('#tbl-stock tbody tr[data-recherche]'));
   if (!lignes.length) return;
+
+  /* Quantite d'un article dans un depot donne, lue sur la ligne. */
+  function quantite(tr, idDepot) {
+    const paire = (tr.dataset.depots || '').split(' ')
+      .find(x => x.split(':')[0] === idDepot);
+    return paire ? parseFloat(paire.split(':')[1]) || 0 : 0;
+  }
+
   function appliquer() {
     const texte = (q.value || '').trim().toLowerCase();
+    const cat = categorie.value;
+    const dep = depot.value;
+    let visibles = 0;
+
     lignes.forEach(tr => {
+      const qte = dep ? quantite(tr, dep) : parseFloat(tr.dataset.total) || 0;
       const ok = (!texte || tr.dataset.recherche.includes(texte))
-              && (!alerte.checked || tr.dataset.alerte === '1');
+              && (!cat || tr.dataset.categorie === cat)
+              && (!alerte.checked || tr.dataset.alerte === '1')
+              && (!nonvide.checked || qte > 0)
+              // Un depot choisi masque les articles absents de ce depot :
+              // sinon la colonne affichee ne serait qu'une colonne de zeros.
+              && (!dep || qte !== 0);
       tr.style.display = ok ? '' : 'none';
+      if (ok) visibles++;
     });
+
+    // Choisir un depot restreint aussi les colonnes affichees.
+    document.querySelectorAll('#tbl-stock .col-depot').forEach(c => {
+      c.style.display = (!dep || c.dataset.depot === dep) ? '' : 'none';
+    });
+
+    compte.textContent = visibles + ' / ' + lignes.length + ' article'
+                       + (lignes.length > 1 ? 's' : '');
   }
-  q.addEventListener('input', appliquer);
-  alerte.addEventListener('change', appliquer);
+
+  [q, categorie, depot, alerte, nonvide].forEach(el =>
+    el.addEventListener(el.tagName === 'INPUT' && el.type !== 'checkbox' ? 'input' : 'change', appliquer));
+  reset.addEventListener('click', () => {
+    q.value = ''; categorie.value = ''; depot.value = '';
+    alerte.checked = false; nonvide.checked = false;
+    appliquer();
+  });
+  appliquer();
 })();
 </script>
 {% endblock %}

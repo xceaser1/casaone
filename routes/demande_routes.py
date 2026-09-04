@@ -6,11 +6,11 @@ services/demandes.py, sinon l'API mobile pourrait la contourner.
 """
 from datetime import date
 
-from flask import (Blueprint, flash, jsonify, redirect, render_template,
-                   request, url_for)
+from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
+                   render_template, request, send_from_directory, url_for)
 from flask_login import current_user, login_required
 
-from models.demande import STATUTS, URGENCES, Demande
+from models.demande import STATUTS, TYPES_BESOIN, URGENCES, Demande
 from models.stock import Article, Depot
 from services import demandes as svc
 from services.contexte import projet_actif_id
@@ -57,6 +57,7 @@ def _contexte_saisie(pid):
         "depots": Depot.query.filter_by(projet_id=pid, actif=True)
                   .order_by(Depot.code).all(),
         "urgences": URGENCES,
+        "types_besoin": TYPES_BESOIN,
         "statuts": STATUTS,
     }
 
@@ -74,6 +75,7 @@ def index():
         urgence=args.get("urgence") or None,
         demandeur=args.get("demandeur") or None,
         recherche=args.get("q") or None,
+        type_besoin=args.get("type") or None,
     )
     return render_template(
         "demandes.html", page="demandes", lignes=lignes,
@@ -109,6 +111,7 @@ def nouvelle():
                 lignes=_lignes_du_formulaire(),
                 localisation=request.form.get("localisation"),
                 urgence=request.form.get("urgence", "normale"),
+                type_besoin=request.form.get("type_besoin", "materiel"),
                 besoin_pour=_jour(request.form.get("besoin_pour")),
                 commentaire=request.form.get("commentaire"),
                 projet_id=pid,
@@ -143,6 +146,7 @@ def modifier(did):
                 objet=request.form.get("objet", ""),
                 localisation=request.form.get("localisation"),
                 urgence=request.form.get("urgence"),
+                type_besoin=request.form.get("type_besoin"),
                 besoin_pour=_jour(request.form.get("besoin_pour")),
                 commentaire=request.form.get("commentaire"),
                 lignes=_lignes_du_formulaire(),
@@ -239,6 +243,7 @@ def api_creer():
             lignes=d.get("lignes") or [],
             localisation=d.get("localisation"),
             urgence=d.get("urgence", "normale"),
+            type_besoin=d.get("type_besoin", "materiel"),
             besoin_pour=_jour(d.get("besoin_pour")),
             commentaire=d.get("commentaire"),
             soumettre=bool(d.get("soumettre", True)),
@@ -247,3 +252,67 @@ def api_creer():
         return jsonify({"ok": False, "erreur": str(e)}), 400
     return jsonify({"ok": True, "id": demande.id, "numero": demande.numero,
                     "statut": demande.statut})
+
+
+# ------------------------------------------------------------ Pieces jointes
+@bp.route("/<int:did>/pieces", methods=["POST"])
+@login_required
+@exige("demandes", "create")
+def ajouter_piece(did):
+    try:
+        for fichier in request.files.getlist("piece"):
+            if fichier and fichier.filename:
+                svc.ajouter_piece(did, fichier, current_user.username, current_app.config)
+    except svc.Refus as e:
+        flash(str(e), "erreur")
+        return redirect(url_for("demandes.detail", did=did))
+    flash("Pièce jointe ajoutée.", "succes")
+    return redirect(url_for("demandes.detail", did=did))
+
+
+@bp.route("/pieces/<int:pid_piece>")
+@login_required
+@exige("demandes")
+def voir_piece(pid_piece):
+    """Sert un fichier joint.
+
+    Passe par une route plutot que par /static : le controle de droits et
+    l'appartenance au projet actif sont ainsi verifies a chaque acces.
+    """
+    piece = svc.piece(pid_piece)
+    if piece is None:
+        abort(404)
+    return send_from_directory(
+        svc.dossier_pieces(current_app.config), piece.fichier,
+        # Les images et PDF s'affichent ; le nom d'origine est restitue au
+        # telechargement, jamais le nom interne.
+        as_attachment=not (piece.est_image or (piece.type_mime or "").endswith("pdf")),
+        download_name=piece.nom,
+    )
+
+
+@bp.route("/pieces/<int:pid_piece>/supprimer", methods=["POST"])
+@login_required
+@exige("demandes", "edit")
+def supprimer_piece(pid_piece):
+    piece = svc.piece(pid_piece)
+    did = piece.demande_id if piece else None
+    try:
+        svc.supprimer_piece(pid_piece, current_app.config)
+    except svc.Refus as e:
+        flash(str(e), "erreur")
+    else:
+        flash("Pièce supprimée.", "succes")
+    return redirect(url_for("demandes.detail", did=did) if did else url_for("demandes.index"))
+
+
+# ----------------------------------------------------------------- Messages
+@bp.route("/<int:did>/messages", methods=["POST"])
+@login_required
+@exige("demandes")
+def ajouter_message(did):
+    try:
+        svc.ajouter_message(did, current_user.username, request.form.get("texte"))
+    except svc.Refus as e:
+        flash(str(e), "erreur")
+    return redirect(url_for("demandes.detail", did=did) + "#echange")
