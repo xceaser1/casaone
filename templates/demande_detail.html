@@ -50,6 +50,7 @@
   <div class="carte">
     <div class="carte-tete"><h3>Suivi</h3></div>
     <div class="carte-corps">
+      <div class="fiche-l"><span>Nature</span><b>{{ d.type_libelle }}</b></div>
       <div class="fiche-l"><span>Demandeur</span><b>{{ d.demandeur or '—' }}</b></div>
       <div class="fiche-l"><span>Créée le</span><b>{{ d.cree_le.strftime('%d/%m/%Y %H:%M') if d.cree_le }}</b></div>
       {% if d.localisation %}<div class="fiche-l"><span>Où</span><b>{{ d.localisation }}</b></div>{% endif %}
@@ -69,6 +70,94 @@
       <p style="margin-top:12px;color:var(--doux);font-size:.88rem">{{ d.commentaire }}</p>
       {% endif %}
     </div>
+  </div>
+</div>
+
+{# --------------------------------------------------- Pieces jointes #}
+<div class="carte" style="margin-top:16px">
+  <div class="carte-tete">
+    <h3>Pièces jointes</h3>
+    <span class="pres-compte">{{ d.pieces|length }} fichier{{ 's' if d.pieces|length > 1 }}</span>
+  </div>
+  <div class="carte-corps">
+    {% if d.pieces %}
+    <div class="galerie-pieces">
+      {% for p in d.pieces %}
+      <figure class="piece">
+        <a href="{{ url_for('demandes.voir_piece', pid_piece=p.id) }}" target="_blank" rel="noopener">
+          {% if p.est_image %}
+          <img src="{{ url_for('demandes.voir_piece', pid_piece=p.id) }}" alt="{{ p.nom }}" loading="lazy">
+          {% else %}
+          <span class="piece-pdf">PDF</span>
+          {% endif %}
+        </a>
+        <figcaption>
+          <b title="{{ p.nom }}">{{ p.nom }}</b>
+          <small>{{ p.taille_lisible }} · {{ p.ajoute_par or '—' }}</small>
+        </figcaption>
+        {% if peut('demandes', 'edit') %}
+        <form method="post" action="{{ url_for('demandes.supprimer_piece', pid_piece=p.id) }}"
+              onsubmit="return confirmerSuppression('Supprimer « {{ p.nom }} » ?')">
+          <button class="btn mini btn-danger" type="submit">✕</button>
+        </form>
+        {% endif %}
+      </figure>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="badges-info" style="margin:0 0 12px">
+      Une photo vaut souvent mieux qu'une description : la pièce cassée, l'accès,
+      la référence illisible sur l'étiquette.
+    </p>
+    {% endif %}
+
+    {% if peut('demandes', 'create') %}
+    <form method="post" action="{{ url_for('demandes.ajouter_piece', did=d.id) }}"
+          enctype="multipart/form-data" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px">
+      {# capture : sur telephone, ouvre directement l'appareil photo #}
+      <input type="file" name="piece" multiple accept="image/*,.pdf" capture="environment">
+      <button class="btn" type="submit">Joindre</button>
+      <small style="color:var(--doux)">Photos ou PDF · 8 Mo maximum par fichier</small>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{# --------------------------------------------------------- Echange #}
+<div class="carte" style="margin-top:16px" id="echange">
+  <div class="carte-tete">
+    <h3>Échange</h3>
+    <span class="pres-compte">{{ d.messages|length }} message{{ 's' if d.messages|length > 1 }}</span>
+  </div>
+  <div class="carte-corps">
+    {% if d.messages %}
+    <div class="fil-messages">
+      {% for m in d.messages %}
+      <div class="message {{ 'mien' if m.auteur == current_user.username }}">
+        <div class="message-tete">
+          <b>{{ m.auteur }}</b>
+          <small>{{ m.cree_le.strftime('%d/%m/%Y %H:%M') if m.cree_le }}</small>
+        </div>
+        <p>{{ m.texte }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="badges-info" style="margin:0 0 12px">
+      Aucun message. Utilisez cet espace pour préciser une référence ou expliquer
+      un refus, plutôt que de repartir sur le téléphone.
+    </p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('demandes.ajouter_message', did=d.id) }}"
+          style="display:flex;gap:10px;align-items:flex-end;margin-top:12px">
+      <div class="champ" style="flex:1;margin:0">
+        <label for="texte">Écrire au demandeur</label>
+        <textarea id="texte" name="texte" rows="2" required
+                  placeholder="Quelle référence exactement ? Livraison prévue demain matin…"></textarea>
+      </div>
+      <button class="btn btn-fonce" type="submit">Envoyer</button>
+    </form>
   </div>
 </div>
 

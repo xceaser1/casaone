@@ -1187,3 +1187,25 @@ body::before {
 .fiche-l:last-child { border-bottom: 0; }
 .fiche-l > span { color: var(--doux); flex: 0 0 auto; }
 .fiche-l > b { color: var(--encre); font-weight: 600; text-align: right; min-width: 0; }
+
+/* ------------------------------------- Pieces jointes et echange (demandes) */
+.galerie-pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.piece { margin: 0; position: relative; border: 1px solid var(--bord); border-radius: var(--r-m); overflow: hidden; background: var(--blanc); }
+.piece img { display: block; width: 100%; height: 110px; object-fit: cover; }
+.piece-pdf {
+  display: grid; place-items: center; height: 110px;
+  background: var(--rouge-10); color: var(--rouge); font-weight: 800; letter-spacing: .08em;
+}
+.piece figcaption { padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.piece figcaption b { font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.piece figcaption small { color: var(--doux); font-size: .72rem; }
+.piece form { position: absolute; top: 6px; right: 6px; margin: 0; }
+
+.fil-messages { display: flex; flex-direction: column; gap: 10px; }
+.message { background: var(--vert-05); border: 1px solid var(--bord); border-radius: var(--r-m); padding: 10px 12px; max-width: 82%; }
+/* Ses propres messages alignes a droite : on retrouve d'un coup d'oeil qui parle. */
+.message.mien { align-self: flex-end; background: var(--vert-10); border-color: var(--vert-20); }
+.message-tete { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
+.message-tete b { font-size: .82rem; color: var(--encre); }
+.message-tete small { color: var(--doux); font-size: .72rem; }
+.message p { margin: 4px 0 0; font-size: .88rem; white-space: pre-wrap; }

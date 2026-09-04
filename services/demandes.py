@@ -5,12 +5,15 @@ endroit ou l'on decide qu'une demande peut changer d'etat, et le seul qui
 ecrive dans le journal de stock. Une regle metier oubliee dans un formulaire
 serait contournable par l'API mobile.
 """
+import os
+import uuid
 from datetime import datetime
 
 from sqlalchemy import func
 
 from models.db import db
-from models.demande import Demande, LigneDemande
+from models.demande import (EXTENSIONS_JOINTES, TAILLE_MAX_JOINTE, Demande,
+                            LigneDemande, MessageDemande, PieceJointe)
 from models.stock import Mouvement
 from services import stock as svc_stock
 from services.contexte import projet_actif_id
@@ -51,7 +54,8 @@ def prochain_numero(projet_id=None):
 # --------------------------------------------------------------------------
 # Lecture
 # --------------------------------------------------------------------------
-def lister(projet_id=None, statut=None, urgence=None, demandeur=None, recherche=None):
+def lister(projet_id=None, statut=None, urgence=None, demandeur=None,
+           recherche=None, type_besoin=None):
     """Demandes du projet, les plus recentes d'abord."""
     pid = projet_id or projet_actif_id()
     q = Demande.query.filter(Demande.projet_id == pid)
@@ -60,6 +64,8 @@ def lister(projet_id=None, statut=None, urgence=None, demandeur=None, recherche=
         q = q.filter(Demande.statut == statut)
     if urgence:
         q = q.filter(Demande.urgence == urgence)
+    if type_besoin:
+        q = q.filter(Demande.type_besoin == type_besoin)
     if demandeur:
         q = q.filter(Demande.demandeur == demandeur)
     if recherche:
@@ -105,7 +111,8 @@ def valeurs_filtres(projet_id=None):
 # Ecriture
 # --------------------------------------------------------------------------
 def creer(objet, demandeur, lignes, localisation=None, urgence="normale",
-          besoin_pour=None, commentaire=None, projet_id=None, soumettre=False):
+          besoin_pour=None, commentaire=None, projet_id=None, soumettre=False,
+          type_besoin="materiel"):
     """Cree une demande et ses lignes.
 
     `lignes` : liste de dicts {article_id | designation_libre, quantite, unite, note}.
@@ -124,6 +131,8 @@ def creer(objet, demandeur, lignes, localisation=None, urgence="normale",
         objet=objet.strip(),
         localisation=(localisation or "").strip() or None,
         urgence=urgence if urgence in ("normale", "urgente", "critique") else "normale",
+        type_besoin=type_besoin if type_besoin in
+                    ("materiel", "engin", "mainoeuvre", "autre") else "materiel",
         besoin_pour=besoin_pour,
         commentaire=(commentaire or "").strip() or None,
         demandeur=demandeur,
@@ -139,7 +148,8 @@ def creer(objet, demandeur, lignes, localisation=None, urgence="normale",
 
 
 def modifier(demande_id, objet=None, localisation=None, urgence=None,
-             besoin_pour=None, commentaire=None, lignes=None, projet_id=None):
+             besoin_pour=None, commentaire=None, lignes=None, projet_id=None,
+             type_besoin=None):
     """Modifie une demande encore ouverte.
 
     Une demande validee, refusee ou servie n'est plus modifiable : elle a
@@ -157,6 +167,8 @@ def modifier(demande_id, objet=None, localisation=None, urgence=None,
         d.localisation = localisation.strip() or None
     if urgence in ("normale", "urgente", "critique"):
         d.urgence = urgence
+    if type_besoin in ("materiel", "engin", "mainoeuvre", "autre"):
+        d.type_besoin = type_besoin
     if besoin_pour is not None:
         d.besoin_pour = besoin_pour
     if commentaire is not None:
@@ -306,3 +318,100 @@ def _nettoyer_lignes(lignes):
             "note": (brute.get("note") or "").strip()[:255] or None,
         })
     return propres
+
+
+# --------------------------------------------------------------------------
+# Pieces jointes
+# --------------------------------------------------------------------------
+def dossier_pieces(app_config):
+    """Repertoire de stockage, cree au besoin.
+
+    Hors de /static a dessein : sous static, un fichier serait servi a qui
+    connait son URL, sans aucune verification de droits.
+    """
+    chemin = os.path.join(app_config["UPLOAD_FOLDER"], "demandes")
+    os.makedirs(chemin, exist_ok=True)
+    return chemin
+
+
+def ajouter_piece(demande_id, fichier, par, app_config, projet_id=None):
+    """Enregistre une photo ou un PDF joint a une demande."""
+    d = _demande(demande_id, projet_id)
+
+    nom = (getattr(fichier, "filename", "") or "").strip()
+    if not nom:
+        raise Refus("Aucun fichier reçu.")
+
+    extension = os.path.splitext(nom)[1].lower()
+    if extension not in EXTENSIONS_JOINTES:
+        raise Refus("Formats acceptés : photo (JPG, PNG, WEBP, HEIC) ou PDF.")
+
+    # Taille lue sur le flux : on ne fait pas confiance a Content-Length.
+    fichier.stream.seek(0, os.SEEK_END)
+    taille = fichier.stream.tell()
+    fichier.stream.seek(0)
+    if taille == 0:
+        raise Refus("Le fichier est vide.")
+    if taille > TAILLE_MAX_JOINTE:
+        raise Refus(f"Fichier trop volumineux (maximum {TAILLE_MAX_JOINTE // (1024 * 1024)} Mo).")
+
+    # Nom genere : un nom fourni par l'utilisateur pourrait remonter
+    # l'arborescence ou ecraser un fichier existant.
+    interne = f"{uuid.uuid4().hex}{extension}"
+    fichier.save(os.path.join(dossier_pieces(app_config), interne))
+
+    piece = PieceJointe(
+        demande_id=d.id, nom=nom[:255], fichier=interne,
+        type_mime=getattr(fichier, "mimetype", None), taille=taille, ajoute_par=par,
+    )
+    db.session.add(piece)
+    db.session.commit()
+    return piece
+
+
+def supprimer_piece(piece_id, app_config, projet_id=None):
+    """Retire une piece jointe, et son fichier."""
+    pid = projet_id or projet_actif_id()
+    piece = (PieceJointe.query.join(Demande)
+             .filter(PieceJointe.id == piece_id, Demande.projet_id == pid).first())
+    if piece is None:
+        raise Refus("Pièce introuvable.")
+
+    chemin = os.path.join(dossier_pieces(app_config), piece.fichier)
+    db.session.delete(piece)
+    db.session.commit()
+    # Le fichier part apres la base : un fichier orphelin est sans gravite,
+    # une ligne pointant vers un fichier absent casserait l'affichage.
+    try:
+        os.remove(chemin)
+    except OSError:
+        pass
+
+
+def piece(piece_id, projet_id=None):
+    """Piece jointe d'une demande du projet courant, ou None."""
+    pid = projet_id or projet_actif_id()
+    return (PieceJointe.query.join(Demande)
+            .filter(PieceJointe.id == piece_id, Demande.projet_id == pid).first())
+
+
+# --------------------------------------------------------------------------
+# Messages
+# --------------------------------------------------------------------------
+def ajouter_message(demande_id, auteur, texte, projet_id=None):
+    """Ajoute un message a la conversation d'une demande.
+
+    Volontairement possible a tout statut : c'est souvent apres un refus qu'on
+    a le plus besoin de s'expliquer.
+    """
+    d = _demande(demande_id, projet_id)
+    texte = (texte or "").strip()
+    if not texte:
+        raise Refus("Le message est vide.")
+    if len(texte) > 4000:
+        raise Refus("Message trop long (4000 caractères maximum).")
+
+    message = MessageDemande(demande_id=d.id, auteur=auteur, texte=texte)
+    db.session.add(message)
+    db.session.commit()
+    return message
