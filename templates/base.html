@@ -51,7 +51,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block titre %}{{ projet_nom }}{% endblock %} — {{ societe }}</title>
   <link rel="stylesheet" href="{{ statique('css/style.css') }}">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2314603c'/><text x='16' y='22' font-size='15' font-family='sans-serif' fill='white' text-anchor='middle'>U</text></svg>">
+  {# Favicon : meme batiment que l'icone de l'application, en SVG inline pour eviter une requete. #}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='5' fill='%231b2340'/><g fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' transform='translate(2.4 2.4) scale(0.8)'><path d='M3 21h18'/><path d='M6 21V7l6-4 6 4v14'/><path d='M10 21v-4h4v4'/></g><g fill='white'><rect x='9.1' y='9.7' width='1.3' height='1.3'/><rect x='13.6' y='9.7' width='1.3' height='1.3'/><rect x='9.1' y='12.5' width='1.3' height='1.3'/><rect x='13.6' y='12.5' width='1.3' height='1.3'/></g></svg>">
   {% include "_pwa.html" %}
 </head>
 <body>
