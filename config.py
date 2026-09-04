@@ -101,8 +101,8 @@ class Config:
     # --- Application Android ---------------------------------------------
     # Version publiee : l'APK compare son propre versionCode a celle-ci au
     # demarrage et propose la mise a jour. A incrementer a chaque diffusion.
-    APK_VERSION_CODE = int(os.environ.get("APK_VERSION_CODE", "2"))
-    APK_VERSION_NOM = os.environ.get("APK_VERSION_NOM", "2.0")
+    APK_VERSION_CODE = int(os.environ.get("APK_VERSION_CODE", "3"))
+    APK_VERSION_NOM = os.environ.get("APK_VERSION_NOM", "2.1")
     # Fichier servi par /api/mobile/telecharger. Hors depot (voir .gitignore) :
     # un binaire de 26 Mo n'a pas sa place dans l'historique git.
     APK_FICHIER = os.environ.get("APK_FICHIER", os.path.join(BASE_DIR, "dist", "casaone.apk"))
