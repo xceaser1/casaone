@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <FrameLayout android:layout_width="match_parent" android:layout_height="0dp"
+            android:layout_weight="1">
+            <WebView android:id="@+id/web"
+                android:layout_width="match_parent" android:layout_height="match_parent"/>
+            <ProgressBar android:id="@+id/progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent" android:layout_height="3dp"
+                android:max="100" android:progress="0" android:visibility="gone"/>
+        </FrameLayout>
+
+        <LinearLayout android:id="@+id/nav"
+            android:layout_width="match_parent" android:layout_height="60dp"
+            android:orientation="horizontal" android:background="@color/blanc"
+            android:elevation="10dp"/>
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/offline"
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical" android:gravity="center"
+        android:background="@color/fond" android:visibility="gone" android:padding="32dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Connexion impossible" android:textSize="18sp"
+            android:textStyle="bold" android:textColor="@color/vert_fonce"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Vérifiez le Wi-Fi et que le serveur est démarré."
+            android:textColor="@color/doux" android:layout_marginTop="6dp"
+            android:layout_marginBottom="20dp"/>
+        <Button android:id="@+id/retry"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Réessayer" android:backgroundTint="@color/vert_fonce"
+            android:textColor="@color/blanc"/>
+    </LinearLayout>
+</FrameLayout>

@@ -1,0 +1,4 @@
+// Configuration racine — plugins declares, appliques dans :app
+plugins {
+    id 'com.android.application' version '8.13.0' apply false
+}

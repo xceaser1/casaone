@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Raccourcis a l'appui long sur l'icone : les trois gestes du chantier. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="scan"
+        android:enabled="true"
+        android:icon="@drawable/ic_tab_scan"
+        android:shortcutShortLabel="@string/rc_scan"
+        android:shortcutLongLabel="@string/rc_scan_long">
+        <intent android:action="android.intent.action.MAIN"
+            android:targetPackage="com.urbagec.casaone"
+            android:targetClass="com.urbagec.casaone.MainActivity">
+            <extra android:name="chemin" android:value="/scan"/>
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="presences"
+        android:enabled="true"
+        android:icon="@drawable/ic_tab_presence"
+        android:shortcutShortLabel="@string/rc_presences"
+        android:shortcutLongLabel="@string/rc_presences_long">
+        <intent android:action="android.intent.action.MAIN"
+            android:targetPackage="com.urbagec.casaone"
+            android:targetClass="com.urbagec.casaone.MainActivity">
+            <extra android:name="chemin" android:value="/presences"/>
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="stock"
+        android:enabled="true"
+        android:icon="@drawable/ic_tab_dashboard"
+        android:shortcutShortLabel="@string/rc_stock"
+        android:shortcutLongLabel="@string/rc_stock_long">
+        <intent android:action="android.intent.action.MAIN"
+            android:targetPackage="com.urbagec.casaone"
+            android:targetClass="com.urbagec.casaone.MainActivity">
+            <extra android:name="chemin" android:value="/stock/"/>
+        </intent>
+    </shortcut>
+</shortcuts>

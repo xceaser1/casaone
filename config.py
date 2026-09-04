@@ -98,5 +98,13 @@ class Config:
     REMEMBER_COOKIE_SAMESITE = "Lax"
     REMEMBER_COOKIE_SECURE = _HTTPS or _PROD
 
+    # --- Application Android ---------------------------------------------
+    # Version publiee : l'APK compare son propre versionCode a celle-ci au
+    # demarrage et propose la mise a jour. A incrementer a chaque diffusion.
+    APK_VERSION_CODE = int(os.environ.get("APK_VERSION_CODE", "2"))
+    APK_VERSION_NOM = os.environ.get("APK_VERSION_NOM", "2.0")
+    APK_URL = os.environ.get("APK_URL", "")
+    APK_NOTES = os.environ.get("APK_NOTES", "")
+
     PAGE_SIZE_DEFAULT = 25
     PAGE_SIZE_MAX = 200

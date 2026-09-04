@@ -1,0 +1,15 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+
+# Cle de signature : ne doit jamais etre versionnee.
+keystore.properties
+*.jks
+*.keystore

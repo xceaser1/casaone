@@ -49,6 +49,7 @@ def creer_app(config_class=Config):
     from routes.pointage_routes import bp as pointage_bp
     from routes.projet_routes import bp as projets_bp
     from routes.stock_routes import bp as stock_bp
+    from routes.mobile_routes import bp as mobile_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(pages_bp)
@@ -57,6 +58,7 @@ def creer_app(config_class=Config):
     app.register_blueprint(projets_bp)
     app.register_blueprint(pointage_bp)
     app.register_blueprint(stock_bp)
+    app.register_blueprint(mobile_bp)
 
     _enregistrer_contexte(app)
     _enregistrer_erreurs(app)

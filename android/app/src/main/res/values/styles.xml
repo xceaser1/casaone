@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Theme principal : barre verte, contenu clair -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/vert_sombre</item>
+        <item name="android:colorPrimaryDark">@color/vert_sombre</item>
+        <item name="android:colorAccent">@color/vert</item>
+        <item name="android:statusBarColor">@color/vert_sombre</item>
+        <item name="android:windowBackground">@color/fond</item>
+        <item name="android:actionBarStyle">@style/AppActionBar</item>
+    </style>
+
+    <!-- Barre d'application : meme bleu nuit que la barre laterale du web -->
+    <style name="AppActionBar" parent="@android:style/Widget.Material.ActionBar.Solid">
+        <item name="android:background">@color/vert_sombre</item>
+        <item name="android:elevation">6dp</item>
+    </style>
+
+    <!-- Ecran de lancement (splash) -->
+    <style name="SplashTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:statusBarColor">@color/vert_sombre</item>
+    </style>
+</resources>
