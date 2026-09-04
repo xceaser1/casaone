@@ -90,6 +90,12 @@ public class MainActivity extends Activity {
                     @Override public void onClick(View v) { masquerHorsLigne(); charger(null); }
                 });
             }
+            View changer = findViewById(R.id.changer_adresse);
+            if (changer != null) {
+                changer.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) { demanderUrl(false); }
+                });
+            }
 
             configurerWebView();
             demanderAutorisations();
@@ -181,7 +187,21 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public void onReceivedSslError(WebView v, SslErrorHandler handler, SslError err) {
-                handler.proceed();   // certificat auto-signe du serveur de chantier
+                // Le serveur de chantier presente un certificat auto-signe : on
+                // ne passe outre que pour une adresse privee ou Tailscale.
+                // Sur un domaine public (Render), une erreur de certificat est
+                // un vrai signal d'alerte et doit rester bloquante — sinon la
+                // coque accepterait n'importe quel certificat, pour n'importe
+                // quel hote, et l'interception deviendrait triviale.
+                String hote = null;
+                try {
+                    hote = Uri.parse(err.getUrl()).getHost();
+                } catch (Throwable ignore) { }
+                if (Reseau.adressePrivee(hote)) {
+                    handler.proceed();
+                } else {
+                    handler.cancel();
+                }
             }
             @Override
             public void onPageStarted(WebView v, String url, Bitmap favicon) {
@@ -198,6 +218,9 @@ public class MainActivity extends Activity {
                 if (req.isForMainFrame() && offline != null) {
                     erreurChargement = true;
                     offline.setVisibility(View.VISIBLE);
+                    android.widget.TextView adresse =
+                        (android.widget.TextView) findViewById(R.id.adresse_essayee);
+                    if (adresse != null) adresse.setText(base());
                 }
             }
             @Override
@@ -381,6 +404,23 @@ public class MainActivity extends Activity {
                     VerificationVersion.lancer(MainActivity.this);
                 }
             }).show();
+    }
+
+    // L'adresse doit rester modifiable en permanence, pas seulement depuis
+    // l'ecran d'erreur : un serveur peut changer d'adresse sans que
+    // l'application soit en panne.
+    @Override
+    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        menu.add(0, 1, 0, "Adresse du serveur");
+        menu.add(0, 2, 0, "Recharger");
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        if (item.getItemId() == 1) { demanderUrl(false); return true; }
+        if (item.getItemId() == 2) { masquerHorsLigne(); charger(null); return true; }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
