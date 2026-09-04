@@ -27,8 +27,12 @@ android {
         targetSdk 34
         versionCode 2
         versionName "2.0"
-        // Adresse par defaut du serveur, modifiable dans l'application.
-        buildConfigField "String", "URL_DEFAUT", "\"https://100.116.11.8:5000\""
+        // Adresse par defaut : le deploiement en ligne, joignable de partout et
+        // muni d'un vrai certificat. L'ancienne valeur pointait vers le poste de
+        // developpement via Tailscale : elle n'aboutissait que si ce poste
+        // faisait tourner le serveur ET que le telephone etait sur Tailscale.
+        // Reste modifiable dans l'application (menu ou ecran d'erreur).
+        buildConfigField "String", "URL_DEFAUT", "\"https://casaone.onrender.com\""
     }
 
     signingConfigs {
