@@ -10,7 +10,9 @@ existants, aucune logique metier n'est dupliquee ici.
 """
 from datetime import date
 
-from flask import Blueprint, current_app, jsonify
+import os
+
+from flask import Blueprint, current_app, jsonify, request, send_file
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
@@ -80,6 +82,32 @@ def etat():
     return jsonify(donnees)
 
 
+@bp.route("/telecharger")
+def telecharger():
+    """Sert l'APK annonce par /version, pour que la mise a jour se suffise a
+    elle-meme.
+
+    Sans cela il faut heberger le fichier ailleurs et tenir l'adresse a jour a
+    la main. Ici, le serveur qui annonce la version distribue aussi le fichier.
+
+    Volontairement accessible sans session : un telephone dont l'application ne
+    demarre plus doit pouvoir la reinstaller. Un APK n'est pas une donnee de
+    chantier, et il est de toute facon signe.
+    """
+    chemin = current_app.config.get("APK_FICHIER") or ""
+    if not chemin or not os.path.isfile(chemin):
+        return jsonify({
+            "ok": False,
+            "erreur": "Aucun APK publie. Deposez le fichier dans dist/casaone.apk.",
+        }), 404
+    return send_file(
+        chemin,
+        mimetype="application/vnd.android.package-archive",
+        as_attachment=True,
+        download_name="casaone.apk",
+    )
+
+
 @bp.route("/version")
 def version():
     """Version publiee de l'application Android.
@@ -91,6 +119,10 @@ def version():
     return jsonify({
         "version_code": current_app.config.get("APK_VERSION_CODE", 1),
         "version_nom": current_app.config.get("APK_VERSION_NOM", "1.0"),
-        "url": current_app.config.get("APK_URL", ""),
+        # A defaut d'URL explicite, on renvoie celle de notre propre route, batie
+        # sur l'hote que le telephone vient d'utiliser : elle reste donc valable
+        # aussi bien en local qu'en ligne.
+        "url": current_app.config.get("APK_URL")
+               or request.url_root.rstrip("/") + "/api/mobile/telecharger",
         "notes": current_app.config.get("APK_NOTES", ""),
     })

@@ -103,6 +103,10 @@ class Config:
     # demarrage et propose la mise a jour. A incrementer a chaque diffusion.
     APK_VERSION_CODE = int(os.environ.get("APK_VERSION_CODE", "2"))
     APK_VERSION_NOM = os.environ.get("APK_VERSION_NOM", "2.0")
+    # Fichier servi par /api/mobile/telecharger. Hors depot (voir .gitignore) :
+    # un binaire de 26 Mo n'a pas sa place dans l'historique git.
+    APK_FICHIER = os.environ.get("APK_FICHIER", os.path.join(BASE_DIR, "dist", "casaone.apk"))
+    # Vide = le serveur annonce sa propre route de telechargement.
     APK_URL = os.environ.get("APK_URL", "")
     APK_NOTES = os.environ.get("APK_NOTES", "")
 
