@@ -1,12 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Avant-plan de l'icone : le batiment de la marque CASA ONE, identique au badge
+  affiche en tete de la barre laterale du web. L'ancienne icone representait un
+  viseur de QR code : elle disait "scanner" alors que l'application couvre tout
+  le suivi de chantier.
+
+  Le glyphe tient dans la zone sure de l'icone adaptative (les 66dp centraux sur
+  108) : au-dela, un lanceur qui recadre en cercle ou en goutte le rognerait.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Coins du viseur de scan -->
-    <path android:strokeColor="#FFFFFF" android:strokeWidth="4"
-        android:fillColor="#00000000" android:strokeLineCap="round"
-        android:pathData="M40,34 h-6 v6 M74,40 v-6 h-6 M40,74 h-6 v-6 M68,74 h6 v-6"/>
-    <!-- Motif QR stylise au centre -->
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M44,44 h8 v8 h-8 z M56,44 h8 v8 h-8 z M44,56 h8 v8 h-8 z M58,58 h6 v6 h-6 z"/>
+
+    <group android:translateX="26" android:translateY="27" android:scaleX="2.33" android:scaleY="2.33">
+        <!-- Sol -->
+        <path android:strokeColor="#FFFFFF" android:strokeWidth="1.9"
+            android:fillColor="#00000000" android:strokeLineCap="round"
+            android:pathData="M3,21 h18"/>
+        <!-- Silhouette de l'immeuble -->
+        <path android:strokeColor="#FFFFFF" android:strokeWidth="1.9"
+            android:fillColor="#00000000" android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M6,21 V7 l6,-4 l6,4 v14"/>
+        <!-- Porte -->
+        <path android:strokeColor="#FFFFFF" android:strokeWidth="1.9"
+            android:fillColor="#00000000" android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M10,21 v-4 h4 v4"/>
+        <!-- Fenetres : carres pleins plutot que des points, dont le rendu
+             depend du support des traits de longueur nulle. -->
+        <path android:fillColor="#FFFFFF"
+            android:pathData="M8.3,9.3 h1.6 v1.6 h-1.6 z M14.1,9.3 h1.6 v1.6 h-1.6 z M8.3,12.8 h1.6 v1.6 h-1.6 z M14.1,12.8 h1.6 v1.6 h-1.6 z"/>
+    </group>
 </vector>
