@@ -177,10 +177,14 @@ function confirmerSuppression(texte) {
     if (libelle) libelle.textContent = sombre ? 'Thème clair' : 'Thème sombre';
     bouton.setAttribute('data-libelle', sombre ? 'Thème clair' : 'Thème sombre');
 
+    // L'interrupteur porte son propre etat, comme dans le modele.
+    const inter = bouton.querySelector('.interrupteur');
+    if (inter) inter.classList.toggle('on', sombre);
+
     // La couleur de la barre systeme suit, sur telephone comme dans la fenetre
-    // installee : sinon un lisere sombre subsiste au-dessus d'un fond clair.
+    // installee : sinon un lisere clair subsiste au-dessus d'un fond sombre.
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', '#1b2340');
+    if (meta) meta.setAttribute('content', sombre ? '#14141a' : '#e8eaee');
   }
 
   appliquer(document.body.classList.contains('theme-sombre'));
