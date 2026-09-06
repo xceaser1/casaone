@@ -57,9 +57,12 @@
 </head>
 <body>
 <script>
+  /* Rail et theme poses avant le premier rendu : sinon l'interface s'affiche
+     dans un etat puis bascule sous les yeux de l'utilisateur. */
   try {
     if (localStorage.getItem('casaone.nav.rail') === '1') document.body.classList.add('rail');
-  } catch (e) { /* stockage indisponible : menu deplie par defaut */ }
+    if (localStorage.getItem('casaone.theme') === 'sombre') document.body.classList.add('theme-sombre');
+  } catch (e) { /* stockage indisponible : etat par defaut */ }
 </script>
 <div class="appli">
   <aside class="sidebar">
@@ -112,6 +115,19 @@
         </div>
       </details>
     </div>
+    {# Identite du compte courant. Le modele la place dans le panneau et non
+       seulement dans la barre du haut : on sait en permanence sous quel compte
+       on travaille, y compris quand la page a defile. #}
+    <div class="sidebar-profil">
+      <span class="avatar-rond" aria-hidden="true">
+        {{ (current_user.nom_complet or current_user.username)[:2]|upper }}
+      </span>
+      <span class="profil-txt">
+        <span class="profil-nom">{{ current_user.nom_complet or current_user.username }}</span>
+        <span class="profil-role">{{ current_user.role.nom if current_user.role }}</span>
+      </span>
+    </div>
+
     <div class="nav-intitule">Menu</div>
     <nav class="nav">
       {# Acces directs. Demandes y figure a part : c'est le point d'entree
@@ -207,6 +223,16 @@
     </nav>
 
     <div class="sidebar-pied">
+      <button type="button" class="bascule-theme" id="bascule-theme"
+              aria-pressed="false" data-libelle="Theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+        </svg>
+        <span class="lib">Thème sombre</span>
+        <span class="interrupteur" aria-hidden="true"><i></i></span>
+      </button>
+
       <a href="{{ url_for('auth.logout') }}" data-libelle="Deconnexion">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

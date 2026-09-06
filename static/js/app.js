@@ -157,6 +157,41 @@ function confirmerSuppression(texte) {
   });
 })();
 
+/* ------------------------------------------------ Bascule de theme
+   Le theme clair remplace le degrade bleu nuit par un fond doux ; la barre
+   laterale, elle, reste sombre : c'est le contraste avec un contenu clair qui
+   rend le menu lisible.
+
+   La classe est deja posee avant le premier rendu par un script en tete de
+   <body> ; ici on ne gere que la bascule et sa memorisation. */
+(function () {
+  const bouton = document.getElementById('bascule-theme');
+  if (!bouton) return;
+  const CLE = 'casaone.theme';
+  const libelle = bouton.querySelector('.lib');
+
+  function appliquer(sombre) {
+    document.body.classList.toggle('theme-sombre', sombre);
+    bouton.setAttribute('aria-pressed', String(sombre));
+    // Le libelle annonce ce vers quoi on bascule, pas l'etat courant.
+    if (libelle) libelle.textContent = sombre ? 'Thème clair' : 'Thème sombre';
+    bouton.setAttribute('data-libelle', sombre ? 'Thème clair' : 'Thème sombre');
+
+    // La couleur de la barre systeme suit, sur telephone comme dans la fenetre
+    // installee : sinon un lisere sombre subsiste au-dessus d'un fond clair.
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', '#1b2340');
+  }
+
+  appliquer(document.body.classList.contains('theme-sombre'));
+
+  bouton.addEventListener('click', () => {
+    const sombre = !document.body.classList.contains('theme-sombre');
+    appliquer(sombre);
+    try { localStorage.setItem(CLE, sombre ? 'sombre' : 'clair'); } catch (e) { /* mode prive */ }
+  });
+})();
+
 /* ------------------------------------------------ Sidebar : mode rail
    Reduction du panneau a ses icones seules. La classe est deja posee avant le
    premier rendu par un script en tete de <body> : ici on ne gere que la
