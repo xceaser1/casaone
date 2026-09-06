@@ -1232,3 +1232,139 @@ body::before {
   .m3d-etiquette { padding: 3px 7px; font-size: .66rem; }
   .m3d-etiquette span { display: none; }
 }
+
+/* =========================================================================
+   SIDEBAR-12 — la forme et les details du modele, poses sur le verre existant
+   ========================================================================= */
+
+/* --- Etat actif : pastille sur le bord DROIT ------------------------------
+   Le modele signale l'element courant par une bande claire et une pastille
+   collee au bord droit du panneau. L'ancienne version cumulait deux reperes :
+   un filet a gauche et une barre qui DEBORDAIT du panneau vers le contenu.
+   Un seul repere, a l'interieur, se lit mieux. */
+.nav a.actif::before { display: none; }
+.nav a.actif::after {
+  content: "";
+  position: absolute;
+  right: 0; left: auto;
+  top: 50%; transform: translateY(-50%);
+  width: 5px; height: 26px;
+  border-radius: 8px 0 0 8px;
+  background: var(--vert-40);
+  box-shadow: -2px 0 12px rgba(110, 160, 248, .55);
+}
+/* Le lien actif ne doit plus se decaler au survol : la pastille bougerait. */
+.nav a.actif:hover { transform: none; }
+
+/* --- Bloc profil ----------------------------------------------------------
+   Le modele place l'identite dans le panneau, pas seulement dans la barre du
+   haut : on sait en permanence sous quel compte on travaille. */
+.sidebar-profil {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.sidebar-profil .avatar-rond {
+  width: 38px; height: 38px; flex: 0 0 38px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: linear-gradient(140deg, var(--vert-40), var(--vert-fonce));
+  color: #fff; font-weight: 700; font-size: .82rem; letter-spacing: .02em;
+  border: 2px solid rgba(255,255,255,.22);
+  box-shadow: 0 4px 12px rgba(4,10,28,.35);
+}
+.sidebar-profil .profil-txt { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sidebar-profil .profil-nom {
+  font-size: .84rem; font-weight: 600; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar-profil .profil-role {
+  font-size: .68rem; color: rgba(255,255,255,.5);
+  text-transform: uppercase; letter-spacing: .1em;
+}
+
+/* --- Interrupteur de theme ------------------------------------------------ */
+.bascule-theme {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 11px 12px; margin-bottom: 4px;
+  border: 0; border-radius: var(--r-s);
+  background: transparent; color: rgba(255,255,255,.78);
+  font-family: inherit; font-size: .875rem; font-weight: 500;
+  text-align: left; cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.bascule-theme:hover { background: rgba(255,255,255,.10); color: #fff; }
+.bascule-theme svg { width: 17px; height: 17px; flex: 0 0 17px; }
+.bascule-theme .lib { flex: 1; min-width: 0; white-space: nowrap; }
+.interrupteur {
+  position: relative; flex: 0 0 auto;
+  width: 38px; height: 21px; border-radius: 99px;
+  background: rgba(255,255,255,.20);
+  transition: background .25s ease;
+}
+.interrupteur i {
+  position: absolute; top: 3px; left: 3px;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  transition: left .25s ease;
+}
+body.theme-sombre .interrupteur { background: var(--vert); }
+body.theme-sombre .interrupteur i { left: 20px; }
+
+/* En mode rail, l'interrupteur se reduit a son icone. */
+@media (min-width: 901px) {
+  body.rail .sidebar-profil { justify-content: center; padding: 12px 0; }
+  body.rail .sidebar-profil .profil-txt { display: none; }
+  body.rail .bascule-theme { justify-content: center; padding: 11px 0; }
+  body.rail .bascule-theme .lib,
+  body.rail .bascule-theme .interrupteur { display: none; }
+}
+
+/* --- Theme sombre ---------------------------------------------------------
+   L'interface par defaut est deja "cadre sombre, contenu clair". Eclaircir le
+   cadre ne produisait presque rien de visible : ce qu'un utilisateur appelle
+   un theme sombre, c'est un CONTENU sombre.
+
+   Tout passe par les jetons, jamais composant par composant : 170 proprietes
+   les utilisent deja, une redefinition emporte donc l'essentiel. Les accents
+   semantiques (alertes, seuils, statuts) gardent volontairement leurs teintes,
+   qui tiennent sur les deux fonds. */
+body.theme-sombre {
+  --blanc: #1a2238;
+  --fond: #121829;
+  --encre: #eef2f9;
+  --texte: #c3cbdb;
+  --doux: #8e99ad;
+  --bord: #2a3350;
+  --bord-fort: #3a4568;
+
+  /* Fonds pales des pastilles : assombris pour rester lisibles en blanc. */
+  --vert-05: #17233f;
+  --vert-10: #1d3057;
+  --vert-20: #27407a;
+  --bleu-10: #16304a;
+  --violet-10: #241f4a;
+  --ambre-10: #3a2a10;
+  --rouge-10: #3a1c18;
+  --cyan-10: #10333a;
+}
+body.theme-sombre .zone {
+  background: rgba(18, 24, 41, .88);
+  border-color: rgba(255,255,255,.08);
+}
+body.theme-sombre .topbar { background: rgba(26, 34, 56, .72); border-bottom-color: var(--bord); }
+body.theme-sombre .carte {
+  background: rgba(26, 34, 56, .92);
+  border-color: var(--bord);
+  box-shadow: 0 2px 6px rgba(0,0,0,.28), 0 14px 34px rgba(0,0,0,.32);
+}
+/* Le tableau alternait des lignes blanches : illisible sur fond sombre. */
+body.theme-sombre .tableau-simple tbody tr:nth-child(even),
+body.theme-sombre .tbl tbody tr:nth-child(even) { background: rgba(255,255,255,.03); }
+body.theme-sombre .tableau-simple tbody tr:hover,
+body.theme-sombre .tbl tbody tr:hover { background: rgba(255,255,255,.06); }
+/* Champs de saisie : le fond blanc par defaut deviendrait aveuglant. */
+body.theme-sombre input, body.theme-sombre select, body.theme-sombre textarea {
+  background: #121829; color: var(--encre); border-color: var(--bord);
+}
+body.theme-sombre .btn { background: #212b46; color: var(--encre); border-color: var(--bord); }
+body.theme-sombre .btn:hover { background: #2a3654; }
