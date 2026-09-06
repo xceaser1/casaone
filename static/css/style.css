@@ -1368,3 +1368,164 @@ body.theme-sombre input, body.theme-sombre select, body.theme-sombre textarea {
 }
 body.theme-sombre .btn { background: #212b46; color: var(--encre); border-color: var(--bord); }
 body.theme-sombre .btn:hover { background: #2a3654; }
+
+/* =========================================================================
+   SIDEBAR-12 — reproduction fidele
+   Valeurs reprises du modele (frontend-joe/sidebars/sidebar-12) : carte
+   blanche, accent violet, coins de 24 px, panneau detache du bord.
+
+   Tout passe par des jetons prefixes --sb-* : le theme sombre du modele se
+   reduit alors a les redefinir, exactement comme son `body.dark`.
+   ========================================================================= */
+:root {
+  --sb-fond: #ffffff;
+  --sb-texte: #22222b;
+  --sb-doux: #a7a9b8;
+  --sb-bande: #f3f0ff;          /* fond de l'element actif */
+  --sb-bande-txt: #6a49f2;
+  --sb-accent: #7b5cf5;         /* pastille et interrupteur */
+  --sb-filet: #edeef2;
+  --sb-surface: #f5f5f7;        /* bouton de reduction */
+  --sb-surface-h: #eaeaec;
+  --sb-page: #e8eaee;           /* fond de page du modele */
+}
+body.theme-sombre {
+  --sb-fond: #23232b;
+  --sb-texte: #f2f2f5;
+  --sb-doux: #8b8d9b;
+  --sb-bande: #2f2748;
+  --sb-bande-txt: #a893ff;
+  --sb-filet: #32323d;
+  --sb-surface: #2b2b33;
+  --sb-surface-h: #35353f;
+  --sb-page: #14141a;
+}
+
+/* --- Le cadre ------------------------------------------------------------- */
+body { background: var(--sb-page); }
+.appli { background: transparent; }
+body::before { background: var(--sb-page); }
+
+@media (min-width: 901px) {
+  .appli { padding: 20px; gap: 20px; }
+  .sidebar {
+    height: calc(100vh - 40px);
+    top: 20px;
+    border-radius: 24px;
+    background: var(--sb-fond);
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    border: 0;
+    box-shadow: 0 10px 34px rgba(31, 26, 74, .10);
+    overflow: hidden;
+  }
+}
+
+/* --- Marque et bouton de reduction ---------------------------------------- */
+.sidebar-marque { padding: 18px 20px 12px; border-bottom: 0; }
+.marque-nom, .marque-court {
+  color: var(--sb-texte);
+  font-size: 1.05rem; font-weight: 800; letter-spacing: .01em; text-transform: uppercase;
+}
+/* Le modele place la commande dans un carre gris arrondi, pas un simple chevron. */
+.rail-bascule {
+  width: 40px; height: 40px; flex: 0 0 40px;
+  border-radius: 13px; border: 0;
+  background: var(--sb-surface); color: var(--sb-doux);
+}
+.rail-bascule:hover { background: var(--sb-surface-h); color: var(--sb-texte); }
+.rail-bascule svg { width: 17px; height: 17px; }
+
+/* --- Selecteur de projet --------------------------------------------------- */
+.sidebar-tete { border-bottom: 0; }
+.projet-switch > summary:hover { background: var(--sb-surface); }
+.marque b { color: var(--sb-texte); }
+.marque small { color: var(--sb-doux); }
+.projet-switch .chevron { color: var(--sb-doux); }
+.marque-badge {
+  background: linear-gradient(140deg, var(--sb-accent), #5b3fd0);
+  border-color: transparent; color: #fff;
+}
+.projet-menu { background: var(--sb-fond); border-color: var(--sb-filet); }
+.projet-menu-titre { color: var(--sb-doux); }
+.projet-item { color: var(--sb-texte); }
+.projet-item:hover { background: var(--sb-surface); }
+.projet-item-txt small { color: var(--sb-doux); }
+.projet-menu-lien { color: var(--sb-bande-txt); }
+
+/* --- Profil ---------------------------------------------------------------- */
+.sidebar-profil { border-bottom: 0; padding: 4px 16px 18px; }
+.sidebar-profil .avatar-rond {
+  background: linear-gradient(140deg, var(--sb-accent), #5b3fd0);
+  border: 3px solid var(--sb-fond);
+  box-shadow: 0 6px 16px rgba(31, 26, 74, .16);
+}
+.sidebar-profil .profil-nom { color: var(--sb-texte); font-size: .9rem; }
+.sidebar-profil .profil-role { color: var(--sb-doux); letter-spacing: .04em; }
+
+/* Filet de separation, comme le <hr> du modele */
+.nav-intitule {
+  margin-top: 0; padding: 16px 20px 6px;
+  border-top: 1px solid var(--sb-filet);
+  color: var(--sb-doux);
+}
+
+/* --- Navigation ------------------------------------------------------------ */
+.nav { padding: 0 0 14px; }
+.nav a {
+  gap: 14px; padding: 0 20px; height: 48px; margin-bottom: 0;
+  border-radius: 0; color: var(--sb-doux); font-size: .92rem; font-weight: 500;
+}
+.nav a:hover { background: transparent; color: var(--sb-texte); transform: none; }
+.nav a svg { opacity: 1; width: 19px; height: 19px; flex: 0 0 19px; }
+.nav a.actif {
+  background: var(--sb-bande); color: var(--sb-bande-txt);
+  font-weight: 600; box-shadow: none;
+}
+.nav a.actif svg { color: var(--sb-bande-txt); }
+.nav a.actif::before { display: none; }
+.nav a.actif::after {
+  content: ""; position: absolute; right: 0; left: auto;
+  top: 50%; transform: translateY(-50%);
+  width: 6px; height: 34px; border-radius: 8px 0 0 8px;
+  background: var(--sb-accent); box-shadow: none;
+}
+
+.nav-sect { border-top: 1px solid var(--sb-filet); padding: 0; margin: 0; }
+.nav > a + .nav-sect { border-top: 1px solid var(--sb-filet); margin-top: 0; padding-top: 0; }
+.nav-sect > summary {
+  padding: 14px 20px 6px; margin: 0; border-radius: 0;
+  color: var(--sb-doux); font-size: .64rem;
+}
+.nav-sect > summary:hover { background: transparent; color: var(--sb-texte); }
+.nav-sect[open] > summary { color: var(--sb-doux); }
+.nav-sect-corps { margin: 0 0 6px; padding-left: 0; border-left: 0; }
+.nav .sous-nav a { padding-left: 53px; color: var(--sb-doux); }
+.nav-badge { background: var(--sb-accent); box-shadow: none; }
+.nav-sect.contient-actif:not([open]) > summary::after {
+  background: var(--sb-accent); box-shadow: 0 0 0 3px rgba(123, 92, 245, .2);
+}
+.nav::-webkit-scrollbar-thumb { background: var(--sb-filet); }
+.nav { scrollbar-color: var(--sb-filet) transparent; }
+
+/* --- Pied : theme et deconnexion ------------------------------------------- */
+.sidebar-pied { border-top: 1px solid var(--sb-filet); padding: 6px 0 4px; }
+.sidebar-pied a, .bascule-theme {
+  height: 48px; padding: 0 20px; gap: 14px; border-radius: 0;
+  color: var(--sb-doux); font-size: .92rem;
+}
+.sidebar-pied a:hover, .bascule-theme:hover { background: transparent; color: var(--sb-texte); }
+.sidebar-pied svg, .bascule-theme svg { width: 19px; height: 19px; flex: 0 0 19px; }
+.interrupteur { width: 44px; height: 24px; background: #d6d8e0; }
+.interrupteur i { width: 18px; height: 18px; }
+body.theme-sombre .interrupteur { background: #3a3a46; }
+body.theme-sombre .interrupteur.on,
+.interrupteur.on { background: var(--sb-accent); }
+.interrupteur.on i { left: 23px; }
+
+/* --- Mode rail : le modele reduit le panneau a la largeur des icones -------- */
+@media (min-width: 901px) {
+  body.rail { --sidebar: 70px; }
+  body.rail .sidebar-marque { padding: 18px 0 12px; }
+  body.rail .nav a, body.rail .sidebar-pied a, body.rail .bascule-theme { padding: 0; }
+  body.rail .nav .sous-nav a { padding-left: 0; }
+}
