@@ -17,6 +17,7 @@
     <a class="btn" href="{{ url_for('stock.export', fmt='xlsx') }}">{{ ico('export') }} Excel</a>
     {% endif %}
     <a class="btn" href="{{ url_for('stock.mouvements') }}">Journal</a>
+    <a class="btn" href="{{ url_for('stock.inventaires') }}">Inventaires</a>
   </div>
 </div>
 
@@ -98,6 +99,7 @@
           <th>Article</th>
           {% for d in depots %}<th class="num col-depot" data-depot="{{ d.id }}" title="{{ d.nom }}">{{ d.code }}</th>{% endfor %}
           <th class="num">Total</th>
+          <th class="num">Valeur</th>
         </tr>
       </thead>
       <tbody>
@@ -108,10 +110,13 @@
             data-depots="{% for d in depots %}{{ d.id }}:{{ l.detail.get(d.id, 0) }}{{ ' ' if not loop.last }}{% endfor %}"
             data-recherche="{{ ((l.article.code or '') ~ ' ' ~ l.article.designation ~ ' ' ~ (l.article.categorie or '')) | lower }}">
           <td>
-            <b>{{ l.article.designation }}</b>
-            <span style="color:var(--doux);font-size:.8rem">
-              {{ l.article.code }}{% if l.article.categorie %} · {{ l.article.categorie }}{% endif %}
-            </span>
+            <a href="{{ url_for('stock.article', aid=l.article.id) }}"
+               style="text-decoration:none;color:inherit" title="Voir la fiche de l'article">
+              <b>{{ l.article.designation }}</b>
+              <span style="color:var(--doux);font-size:.8rem">
+                {{ l.article.code }}{% if l.article.categorie %} · {{ l.article.categorie }}{% endif %}
+              </span>
+            </a>
           </td>
           {% for d in depots %}
           <td class="num col-depot" data-depot="{{ d.id }}">{{ '%g'|format(l.detail.get(d.id, 0)) }}</td>
@@ -120,10 +125,18 @@
             <b>{{ '%g'|format(l.total) }}</b> <span style="color:var(--doux)">{{ l.article.unite }}</span>
             {% if l.alerte %}<span class="badge-statut b-ambre" style="margin-left:6px">Seuil</span>{% endif %}
           </td>
+          <td class="num">
+            {% if l.article.prix_unitaire %}
+            {{ '{:,.0f}'.format(l.total * l.article.prix_unitaire).replace(',', ' ') }}
+            <span style="color:var(--doux);font-size:.8rem">MAD</span>
+            {% else %}
+            <span style="color:var(--doux)" title="Prix unitaire non renseigné">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
         {% if not lignes %}
-        <tr><td colspan="{{ depots|length + 2 }}" style="text-align:center;color:var(--doux);padding:30px">
+        <tr><td colspan="{{ depots|length + 3 }}" style="text-align:center;color:var(--doux);padding:30px">
           Aucun article. Créez-en un pour commencer.
         </td></tr>
         {% endif %}
@@ -209,6 +222,8 @@
         </label>
         <label class="champ"><span>Date</span>
           <input type="date" name="date_mouvement" value="{{ aujourdhui.isoformat() }}"></label>
+        <label class="champ"><span>Fournisseur <em>(entrées)</em></span>
+          <input name="fournisseur" maxlength="120" placeholder="LAFARGE, SONASID…"></label>
         <label class="champ"><span>Référence</span>
           <input name="reference" placeholder="Bon de livraison / de sortie"></label>
       </div>
@@ -256,6 +271,8 @@
         <label class="champ"><span>Unité</span><input name="unite" value="U" placeholder="sac, kg, m3…"></label>
         <label class="champ"><span>Seuil d'alerte <em>(0 = aucun)</em></span>
           <input name="seuil_alerte" inputmode="decimal" value="0"></label>
+        <label class="champ"><span>Prix unitaire <em>(MAD, 0 = non renseigné)</em></span>
+          <input name="prix_unitaire" inputmode="decimal" value="0"></label>
       </div>
     </div>
     <div class="pied">

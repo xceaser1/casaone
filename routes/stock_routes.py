@@ -8,14 +8,17 @@ import csv
 import io
 from datetime import date
 
-from flask import (Blueprint, Response, flash, redirect, render_template,
-                   request, url_for)
+from flask import (Blueprint, Response, abort, current_app, flash, redirect,
+                   render_template, request, send_from_directory, url_for)
 from flask_login import current_user, login_required
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
 from models.db import db
-from models.stock import TYPES, Article, Depot, Mouvement
+from models.stock import (STATUTS_INVENTAIRE, TYPES, Article, Depot,
+                          Inventaire, Mouvement, PieceMouvement)
+from services import inventaire as svc_inv
+from services import pieces as svc_pieces
 from services import stock as svc
 from services.contexte import projet_actif_id
 from services.security import exige
@@ -95,7 +98,10 @@ def mouvements():
 def creer_mouvement():
     pid = projet_actif_id()
     type_ = request.form.get("type")
-    if type_ not in dict(TYPES):
+    # La regularisation ne se saisit pas a la main : elle est ecrite par la
+    # validation d'un inventaire, ce qui garantit qu'un ecart reste toujours
+    # rattache au comptage qui l'a constate.
+    if type_ not in ("entree", "sortie", "transfert"):
         flash("Type de mouvement inconnu.", "erreur")
         return redirect(url_for("stock.index"))
 
@@ -139,6 +145,7 @@ def creer_mouvement():
         depot_dest_id=dest if type_ in ("entree", "transfert") else None,
         quantite=quantite, date_mouvement=_jour(request.form.get("date_mouvement")),
         reference=(request.form.get("reference") or "").strip(),
+        fournisseur=(request.form.get("fournisseur") or "").strip() or None,
         motif=(request.form.get("motif") or "").strip(),
         saisi_par=current_user.username,
     ))
@@ -201,6 +208,7 @@ def creer_article():
             categorie=(request.form.get("categorie") or "").strip(),
             unite=(request.form.get("unite") or "U").strip(),
             seuil_alerte=_nombre(request.form.get("seuil_alerte")),
+            prix_unitaire=_nombre(request.form.get("prix_unitaire")),
         ))
         db.session.commit()
         flash("Article cree.", "succes")
@@ -255,3 +263,170 @@ def export(fmt):
             headers={"Content-Disposition": 'attachment; filename="' + nom + '.xlsx"'})
 
     return redirect(url_for("stock.index"))
+
+
+# ------------------------------------------------------------- Fiche article
+@bp.route("/articles/<int:aid>")
+@login_required
+@exige("stock")
+def article(aid):
+    """Tout ce qu'on sait d'un article, rassemble en une page."""
+    fiche = svc.fiche_article(aid, projet_actif_id())
+    if fiche is None:
+        abort(404)
+    return render_template("article.html", page="stock", f=fiche, types=TYPES,
+                           depots=Depot.query.filter_by(projet_id=projet_actif_id(), actif=True)
+                                  .order_by(Depot.code).all(),
+                           aujourdhui=date.today())
+
+
+# --------------------------------------------------------------- Inventaires
+@bp.route("/inventaires")
+@login_required
+@exige("stock")
+def inventaires():
+    pid = projet_actif_id()
+    return render_template(
+        "inventaires.html", page="inventaires",
+        lignes=svc_inv.lister(pid), statuts=STATUTS_INVENTAIRE,
+        depots=Depot.query.filter_by(projet_id=pid, actif=True).order_by(Depot.code).all(),
+        aujourdhui=date.today(),
+    )
+
+
+@bp.route("/inventaires/nouveau", methods=["POST"])
+@login_required
+@exige("stock", "create")
+def ouvrir_inventaire():
+    try:
+        inv = svc_inv.ouvrir(
+            request.form.get("depot_id", type=int), current_user.username,
+            note=request.form.get("note"),
+            date_comptage=_jour(request.form.get("date_comptage")),
+        )
+    except svc_inv.Refus as e:
+        flash(str(e), "erreur")
+        return redirect(url_for("stock.inventaires"))
+    flash(f"Inventaire #{inv.numero} ouvert · {len(inv.lignes)} articles à compter.", "succes")
+    return redirect(url_for("stock.inventaire", iid=inv.id))
+
+
+@bp.route("/inventaires/<int:iid>")
+@login_required
+@exige("stock")
+def inventaire(iid):
+    pid = projet_actif_id()
+    inv = Inventaire.query.filter_by(id=iid, projet_id=pid).first_or_404()
+    return render_template("inventaire.html", page="inventaires", inv=inv)
+
+
+@bp.route("/inventaires/<int:iid>/saisir", methods=["POST"])
+@login_required
+@exige("stock", "edit")
+def saisir_inventaire(iid):
+    comptes = {}
+    for cle, valeur in request.form.items():
+        if cle.startswith("compte_"):
+            try:
+                comptes[int(cle[7:])] = valeur
+            except ValueError:
+                continue
+    try:
+        svc_inv.saisir(iid, comptes)
+    except svc_inv.Refus as e:
+        flash(str(e), "erreur")
+    else:
+        flash("Comptage enregistré.", "succes")
+    return redirect(url_for("stock.inventaire", iid=iid))
+
+
+@bp.route("/inventaires/<int:iid>/valider", methods=["POST"])
+@login_required
+@exige("stock", "edit")
+def valider_inventaire(iid):
+    try:
+        inv, nb = svc_inv.valider(iid, current_user.username)
+    except svc_inv.Refus as e:
+        flash(str(e), "erreur")
+        return redirect(url_for("stock.inventaire", iid=iid))
+    flash(f"Inventaire #{inv.numero} validé · {nb} régularisation(s) écrite(s) au journal.",
+          "succes")
+    return redirect(url_for("stock.inventaire", iid=iid))
+
+
+@bp.route("/inventaires/<int:iid>/supprimer", methods=["POST"])
+@login_required
+@exige("stock", "delete")
+def supprimer_inventaire(iid):
+    try:
+        svc_inv.supprimer(iid)
+    except svc_inv.Refus as e:
+        flash(str(e), "erreur")
+        return redirect(url_for("stock.inventaire", iid=iid))
+    flash("Inventaire supprimé.", "succes")
+    return redirect(url_for("stock.inventaires"))
+
+
+# -------------------------------------------------- Bons de livraison joints
+SOUS_DOSSIER_BL = "mouvements"
+
+
+def _mouvement_du_projet(mid):
+    return Mouvement.query.filter_by(id=mid, projet_id=projet_actif_id()).first()
+
+
+@bp.route("/mouvements/<int:mid>/pieces", methods=["POST"])
+@login_required
+@exige("stock", "create")
+def joindre_bon(mid):
+    if _mouvement_du_projet(mid) is None:
+        abort(404)
+    try:
+        for fichier in request.files.getlist("piece"):
+            if fichier and fichier.filename:
+                nom, interne, mime, taille = svc_pieces.enregistrer(
+                    fichier, current_app.config, SOUS_DOSSIER_BL)
+                db.session.add(PieceMouvement(
+                    mouvement_id=mid, nom=nom, fichier=interne, type_mime=mime,
+                    taille=taille, ajoute_par=current_user.username))
+        db.session.commit()
+    except svc_pieces.FichierRefuse as e:
+        db.session.rollback()
+        flash(str(e), "erreur")
+        return redirect(request.referrer or url_for("stock.mouvements"))
+    flash("Bon de livraison joint.", "succes")
+    return redirect(request.referrer or url_for("stock.mouvements"))
+
+
+@bp.route("/pieces/<int:pid_piece>")
+@login_required
+@exige("stock")
+def voir_bon(pid_piece):
+    """Sert un bon joint, apres verification des droits ET du projet actif."""
+    piece = (PieceMouvement.query.join(Mouvement)
+             .filter(PieceMouvement.id == pid_piece,
+                     Mouvement.projet_id == projet_actif_id()).first())
+    if piece is None:
+        abort(404)
+    return send_from_directory(
+        svc_pieces.dossier(current_app.config, SOUS_DOSSIER_BL), piece.fichier,
+        as_attachment=not (piece.est_image or (piece.type_mime or "").endswith("pdf")),
+        download_name=piece.nom,
+    )
+
+
+@bp.route("/pieces/<int:pid_piece>/supprimer", methods=["POST"])
+@login_required
+@exige("stock", "edit")
+def supprimer_bon(pid_piece):
+    piece = (PieceMouvement.query.join(Mouvement)
+             .filter(PieceMouvement.id == pid_piece,
+                     Mouvement.projet_id == projet_actif_id()).first())
+    if piece is None:
+        abort(404)
+    fichier = piece.fichier
+    db.session.delete(piece)
+    db.session.commit()
+    svc_pieces.effacer(fichier, current_app.config, SOUS_DOSSIER_BL)
+    flash("Bon supprimé.", "succes")
+    return redirect(request.referrer or url_for("stock.mouvements"))

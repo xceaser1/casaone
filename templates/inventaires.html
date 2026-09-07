@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block titre %}Inventaires{% endblock %}
+{% block sous_entete %}Comptages physiques — {{ projet_actif.nom if projet_actif else projet_nom }}{% endblock %}
+
+{% block contenu %}
+<div class="presences-barre">
+  <p class="badges-info">
+    Le stock affiché est <b>théorique</b> : il se déduit du journal des mouvements.
+    Un inventaire le confronte au réel et écrit les écarts constatés, plutôt que
+    de les corriger en silence.
+  </p>
+  <div class="presences-actions">
+    {% if peut('stock', 'create') and depots %}
+    <button class="btn btn-fonce" onclick="ouvrirModale('m-inventaire')">{{ ico('plus') }} Nouveau comptage</button>
+    {% endif %}
+    <a class="btn" href="{{ url_for('stock.index') }}">État du stock</a>
+  </div>
+</div>
+
+{% if not depots %}
+<div class="carte"><div class="carte-corps" style="text-align:center;padding:40px">
+  <b>Aucun dépôt</b>
+  <p style="color:var(--doux);margin-top:6px">Créez d'abord un dépôt pour pouvoir l'inventorier.</p>
+  <a class="btn btn-fonce" href="{{ url_for('stock.index') }}">Aller au stock</a>
+</div></div>
+{% else %}
+
+<div class="carte">
+  <div class="carte-tete">
+    <h3>Comptages</h3>
+    <span class="pres-compte">{{ lignes|length }} inventaire{{ 's' if lignes|length > 1 }}</span>
+  </div>
+  <div class="pres-liste">
+    {% for i in lignes %}
+    <a class="pres-c" href="{{ url_for('stock.inventaire', iid=i.id) }}"
+       style="text-decoration:none;color:inherit">
+      <span class="pres-av">#{{ i.numero }}</span>
+      <div class="pres-info">
+        <b>{{ i.depot.code if i.depot }} — {{ i.depot.nom if i.depot }}</b>
+        <small>
+          {{ i.date_comptage.strftime('%d/%m/%Y') if i.date_comptage }}
+          · {{ i.lignes|length }} article{{ 's' if i.lignes|length > 1 }}
+          · ouvert par {{ i.ouvert_par or '—' }}
+          {% if i.note %} · {{ i.note }}{% endif %}
+        </small>
+      </div>
+      <div class="pres-tps">
+        {% if i.nb_ecarts %}
+        <span class="badge-statut b-ambre">{{ i.nb_ecarts }} écart{{ 's' if i.nb_ecarts > 1 }}</span>
+        {% endif %}
+        <span class="badge-statut {{ 'b-vert' if i.statut == 'valide' else 'b-bleu' }}">
+          {{ i.statut_libelle }}
+        </span>
+      </div>
+    </a>
+    {% endfor %}
+    {% if not lignes %}
+    <div class="pres-vide">Aucun comptage. Ouvrez-en un pour confronter le stock au réel.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% if peut('stock', 'create') %}
+<div class="modale-fond" id="m-inventaire">
+  <form class="modale" method="post" action="{{ url_for('stock.ouvrir_inventaire') }}">
+    <h3>Nouveau comptage</h3>
+    <div class="corps">
+      <p class="badges-info">
+        Le stock théorique de chaque article sera figé à l'ouverture : les écarts
+        se liront par rapport à ce qui était affiché ce jour-là.
+      </p>
+      <div class="form-grille">
+        <label class="champ"><span>Dépôt à compter</span>
+          <select name="depot_id" required>
+            <option value="">— choisir —</option>
+            {% for d in depots %}<option value="{{ d.id }}">{{ d.code }} — {{ d.nom }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="champ"><span>Date du comptage</span>
+          <input type="date" name="date_comptage" value="{{ aujourdhui.isoformat() }}"></label>
+        <label class="champ" style="grid-column:1/-1"><span>Note</span>
+          <input name="note" maxlength="255" placeholder="Comptage mensuel, contrôle après livraison..."></label>
+      </div>
+    </div>
+    <div class="pied">
+      <button type="button" class="btn" onclick="fermerModale('m-inventaire')">Annuler</button>
+      <button class="btn btn-fonce" type="submit">Ouvrir le comptage</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

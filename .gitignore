@@ -4,8 +4,11 @@ __pycache__/
 database/*.db
 database/*.db.bak-*
 database/.secret_key
-uploads/*.xlsx
-uploads/*.xlsm
+# Fichiers deposes par les utilisateurs : classeurs importes, photos et PDF
+# joints aux demandes et aux mouvements. Le dossier est recree au demarrage.
+# Ne couvrir que *.xlsx laissait passer les sous-dossiers, et une photo de
+# chantier serait entree dans l'historique.
+uploads/
 
 # Fichiers d IDE
 .idea/
