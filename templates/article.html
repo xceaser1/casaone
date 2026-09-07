@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block titre %}{{ f.article.designation }}{% endblock %}
+{% block sous_entete %}{{ f.article.code }}{% if f.article.categorie %} · {{ f.article.categorie }}{% endif %}{% endblock %}
+
+{% block contenu %}
+<div class="presences-barre">
+  <p class="badges-info">
+    {% if f.sous_seuil %}
+    <span class="badge-statut b-ambre">Sous le seuil</span>
+    {% endif %}
+    <span style="color:var(--doux)">
+      Seuil d'alerte : {{ '%g'|format(f.article.seuil_alerte) if f.article.seuil_alerte else 'aucun' }}
+      {% if f.article.prix_unitaire %} · {{ '%g'|format(f.article.prix_unitaire) }} MAD / {{ f.article.unite }}{% endif %}
+    </span>
+  </p>
+  <div class="presences-actions">
+    <a class="btn" href="{{ url_for('stock.index') }}">← État du stock</a>
+    <a class="btn" href="{{ url_for('stock.mouvements', article=f.article.id) }}">Journal filtré</a>
+  </div>
+</div>
+
+<div class="grille-kpi">
+  <div class="kpi accent">
+    <span class="kpi-ic">{{ ico('dalles') }}</span>
+    <div class="kpi-body">
+      <span class="lib">En stock</span>
+      <div class="val">{{ '%g'|format(f.total) }}</div>
+      <div class="note">{{ f.article.unite }}, tous dépôts</div>
+    </div>
+  </div>
+  <div class="kpi">
+    <span class="kpi-ic" style="background:#16a34a">{{ ico('couts') }}</span>
+    <div class="kpi-body">
+      <span class="lib">Valeur</span>
+      <div class="val">{{ '{:,.0f}'.format(f.valeur).replace(',', ' ') }}</div>
+      <div class="note">{% if f.article.prix_unitaire %}MAD{% else %}prix non renseigné{% endif %}</div>
+    </div>
+  </div>
+  <div class="kpi">
+    <span class="kpi-ic" style="background:#7a5cd6">{{ ico('livraisons') }}</span>
+    <div class="kpi-body">
+      <span class="lib">Mouvements</span>
+      <div class="val">{{ f.mouvements|length }}</div>
+      <div class="note">derniers enregistrés</div>
+    </div>
+  </div>
+</div>
+
+<div class="grille-2" style="gap:16px;align-items:start">
+
+  <div class="carte">
+    <div class="carte-tete"><h3>Répartition par dépôt</h3></div>
+    <div class="pres-liste">
+      {% for d in f.par_depot %}
+      <div class="pres-c">
+        <span class="pres-av">{{ d.depot.initiales }}</span>
+        <div class="pres-info">
+          <b>{{ d.depot.nom }}</b>
+          <small>{{ d.depot.code }}{% if d.depot.emplacement %} · {{ d.depot.emplacement }}{% endif %}</small>
+        </div>
+        <div class="pres-tps">
+          <span class="pres-h"><b>{{ '%g'|format(d.quantite) }} {{ f.article.unite }}</b></span>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not f.par_depot %}<div class="pres-vide">Aucun dépôt actif.</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="carte">
+    <div class="carte-tete"><h3>Consommation par mois</h3></div>
+    <div class="carte-corps">
+      {% if f.consommation_mois %}
+      {% set maxi = f.consommation_mois | map(attribute='quantite') | max %}
+      <div class="barres-mois">
+        {% for m in f.consommation_mois %}
+        <div class="barre-mois">
+          <span class="bm-lib">{{ m.mois }}</span>
+          <span class="bm-piste">
+            <i style="width: {{ (100 * m.quantite / maxi) if maxi else 0 }}%"></i>
+          </span>
+          <span class="bm-val">{{ '%g'|format(m.quantite) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <p style="color:var(--doux);font-size:.8rem;margin:12px 0 0">
+        Seules les sorties sont comptées : un transfert déplace la marchandise
+        sans la consommer, une régularisation constate un écart.
+      </p>
+      {% else %}
+      <p class="badges-info" style="margin:0">Aucune sortie enregistrée pour cet article.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="carte" style="margin-top:16px">
+  <div class="carte-tete">
+    <h3>Derniers mouvements</h3>
+    <span class="pres-compte">{{ f.mouvements|length }}</span>
+  </div>
+  <div class="pres-liste">
+    {% for m in f.mouvements %}
+    <div class="pres-c">
+      <span class="pres-av {{ 'sortie' if m.type == 'sortie' }}"
+            {% if m.type == 'transfert' %}style="background:#dbe7fe;color:#1d4ed8"
+            {% elif m.type == 'regularisation' %}style="background:#fdf1dd;color:#e08a1e"{% endif %}>
+        {% if m.type == 'entree' %}↓{% elif m.type == 'sortie' %}↑{% elif m.type == 'transfert' %}⇄{% else %}=={% endif %}
+      </span>
+      <div class="pres-info">
+        <b>{{ m.type_libelle }}</b>
+        <small>
+          {% if m.type == 'transfert' %}{{ m.source.code if m.source }} → {{ m.destination.code if m.destination }}
+          {% elif m.destination %}vers {{ m.destination.code }}
+          {% elif m.source %}depuis {{ m.source.code }}{% endif %}
+          {% if m.fournisseur %} · {{ m.fournisseur }}{% endif %}
+          {% if m.reference %} · {{ m.reference }}{% endif %}
+          {% if m.saisi_par %} · {{ m.saisi_par }}{% endif %}
+        </small>
+      </div>
+      <div class="pres-tps">
+        <span class="pres-h">
+          <b>{{ '%g'|format(m.quantite) }} {{ f.article.unite }}</b>
+          <b style="color:var(--doux);font-weight:500">{{ m.date_mouvement.strftime('%d/%m/%y') if m.date_mouvement }}</b>
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+    {% if not f.mouvements %}<div class="pres-vide">Aucun mouvement.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

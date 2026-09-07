@@ -179,6 +179,8 @@ def migrer_colonnes_ajoutees():
     # (table, colonne, definition SQL) — compatible SQLite et PostgreSQL.
     ajouts = [
         ("demandes", "type_besoin", "VARCHAR(16) DEFAULT 'materiel'"),
+        ("articles", "prix_unitaire", "FLOAT DEFAULT 0"),
+        ("mouvements_stock", "fournisseur", "VARCHAR(120)"),
     ]
 
     inspecteur = db.inspect(db.engine)

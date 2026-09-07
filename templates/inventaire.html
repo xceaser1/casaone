@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block titre %}Inventaire #{{ inv.numero }}{% endblock %}
+{% block sous_entete %}{{ inv.depot.code if inv.depot }} — {{ inv.depot.nom if inv.depot }}{% endblock %}
+
+{% block contenu %}
+<div class="presences-barre">
+  <p class="badges-info">
+    <span class="badge-statut {{ 'b-vert' if inv.statut == 'valide' else 'b-bleu' }}">{{ inv.statut_libelle }}</span>
+    {% if inv.nb_ecarts %}<span class="badge-statut b-ambre">{{ inv.nb_ecarts }} écart{{ 's' if inv.nb_ecarts > 1 }}</span>{% endif %}
+    <span style="color:var(--doux)">
+      Comptage du {{ inv.date_comptage.strftime('%d/%m/%Y') if inv.date_comptage }}
+      · ouvert par {{ inv.ouvert_par or '—' }}
+      {% if inv.valide_par %} · validé par {{ inv.valide_par }}
+        le {{ inv.valide_le.strftime('%d/%m/%Y %H:%M') if inv.valide_le }}{% endif %}
+    </span>
+  </p>
+  <div class="presences-actions">
+    <a class="btn" href="{{ url_for('stock.inventaires') }}">← Tous les comptages</a>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('stock.saisir_inventaire', iid=inv.id) }}">
+<div class="carte">
+  <div class="carte-tete">
+    <h3>Comptage</h3>
+    <span class="pres-compte">{{ inv.lignes|length }} article{{ 's' if inv.lignes|length > 1 }}</span>
+  </div>
+
+  {% if inv.ouvert %}
+  <p class="badges-info" style="padding:12px 18px 0;margin:0">
+    Laissez une case <b>vide</b> pour un article que vous n'avez pas compté : il
+    sera ignoré à la validation. Une case à <b>0</b> signifie au contraire
+    « compté, et il n'y en a plus ».
+  </p>
+  {% endif %}
+
+  <div class="tableau-enveloppe">
+    <table class="tableau-simple">
+      <thead>
+        <tr>
+          <th>Article</th>
+          <th class="num">Théorique</th>
+          <th class="num">Compté</th>
+          <th class="num">Écart</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in inv.lignes %}
+        <tr>
+          <td>
+            <b>{{ l.article.designation if l.article }}</b>
+            <span style="color:var(--doux);font-size:.8rem">
+              {{ l.article.code if l.article }}{% if l.article and l.article.categorie %} · {{ l.article.categorie }}{% endif %}
+            </span>
+          </td>
+          <td class="num">{{ '%g'|format(l.theorique) }} {{ l.article.unite if l.article }}</td>
+          <td class="num">
+            {% if inv.ouvert and peut('stock', 'edit') %}
+            <input name="compte_{{ l.id }}" type="number" step="0.001" min="0"
+                   value="{{ '%g'|format(l.compte) if l.compte is not none }}"
+                   style="max-width:110px;text-align:right"
+                   inputmode="decimal" placeholder="—">
+            {% else %}
+            {{ '%g'|format(l.compte) if l.compte is not none else '—' }}
+            {% endif %}
+          </td>
+          <td class="num">
+            {% if l.ecart is none %}
+            <span style="color:var(--doux)">non compté</span>
+            {% elif l.ecart_significatif %}
+            <b style="color:{{ 'var(--rouge)' if l.ecart < 0 else 'var(--vert-fonce)' }}">
+              {{ '%+g'|format(l.ecart) }}
+            </b>
+            {% else %}
+            <span style="color:var(--doux)">conforme</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if inv.ouvert and peut('stock', 'edit') %}
+  <div class="carte-tete" style="border-top:1px solid var(--bord);border-bottom:0;justify-content:flex-end;gap:10px">
+    <button class="btn" type="submit">Enregistrer le comptage</button>
+  </div>
+  {% endif %}
+</div>
+</form>
+
+{% if inv.ouvert %}
+<div class="carte" style="margin-top:16px">
+  <div class="carte-tete"><h3>Clôturer</h3></div>
+  <div class="carte-corps">
+    {% if peut('stock', 'edit') %}
+    <p class="badges-info">
+      La validation écrit une <b>régularisation</b> au journal pour chaque écart
+      constaté — datée, nominative et rattachée à ce comptage. Le stock théorique
+      rejoint alors le réel. L'opération est définitive.
+    </p>
+    <form method="post" action="{{ url_for('stock.valider_inventaire', iid=inv.id) }}"
+          onsubmit="return confirm('Valider l’inventaire #{{ inv.numero }} et écrire les régularisations ?')">
+      <button class="btn btn-fonce" type="submit">Valider et régulariser</button>
+    </form>
+    {% else %}
+    <p class="badges-info">En attente de validation par un responsable.</p>
+    {% endif %}
+
+    {% if peut('stock', 'delete') %}
+    <form method="post" action="{{ url_for('stock.supprimer_inventaire', iid=inv.id) }}"
+          onsubmit="return confirmerSuppression('Supprimer le comptage #{{ inv.numero }} ?')"
+          style="margin-top:18px;border-top:1px solid var(--bord);padding-top:14px">
+      <button class="btn mini btn-danger" type="submit">Supprimer ce comptage</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

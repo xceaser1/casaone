@@ -48,8 +48,9 @@
     {% for m in lignes %}
     <div class="pres-c">
       <span class="pres-av {{ 'sortie' if m.type == 'sortie' }}"
-            {% if m.type == 'transfert' %}style="background:#dbe7fe;color:#1d4ed8"{% endif %}>
-        {% if m.type == 'entree' %}↓{% elif m.type == 'sortie' %}↑{% else %}⇄{% endif %}
+            {% if m.type == 'transfert' %}style="background:#dbe7fe;color:#1d4ed8"
+            {% elif m.type == 'regularisation' %}style="background:#fdf1dd;color:#e08a1e"{% endif %}>
+        {% if m.type == 'entree' %}↓{% elif m.type == 'sortie' %}↑{% elif m.type == 'transfert' %}⇄{% else %}={% endif %}
       </span>
       <div class="pres-info">
         <b>{{ m.article.designation if m.article else '—' }}</b>
@@ -61,12 +62,17 @@
           {% else %}
             depuis {{ m.source.code if m.source }}
           {% endif %}
+          {% if m.fournisseur %} · <b>{{ m.fournisseur }}</b>{% endif %}
           {% if m.reference %} · {{ m.reference }}{% endif %}
           {% if m.saisi_par %} · {{ m.saisi_par }}{% endif %}
+          {% for p in m.pieces %}
+          · <a href="{{ url_for('stock.voir_bon', pid_piece=p.id) }}" target="_blank" rel="noopener"
+               title="{{ p.nom }}">📎 bon</a>
+          {% endfor %}
         </small>
       </div>
       <div class="pres-tps">
-        <span class="badge-statut {{ 'b-vert' if m.type == 'entree' else ('b-gris' if m.type == 'sortie' else 'b-bleu') }}">
+        <span class="badge-statut {{ 'b-vert' if m.type == 'entree' else ('b-gris' if m.type == 'sortie' else ('b-ambre' if m.type == 'regularisation' else 'b-bleu')) }}">
           {{ m.type_libelle }}
         </span>
         <span class="pres-h">
@@ -74,6 +80,16 @@
           <b style="color:var(--doux);font-weight:500">{{ m.date_mouvement.strftime('%d/%m') }}</b>
         </span>
       </div>
+      {% if peut('stock', 'create') %}
+      <form method="post" action="{{ url_for('stock.joindre_bon', mid=m.id) }}"
+            enctype="multipart/form-data" style="margin:0">
+        {# capture : sur telephone, ouvre directement l'appareil photo #}
+        <input type="file" name="piece" accept="image/*,.pdf" capture="environment"
+               hidden id="bl-{{ m.id }}" onchange="this.form.submit()">
+        <label class="btn mini" for="bl-{{ m.id }}" title="Joindre le bon de livraison"
+               style="cursor:pointer">📎</label>
+      </form>
+      {% endif %}
       {% if peut('stock', 'delete') %}
       <form method="post" action="{{ url_for('stock.supprimer_mouvement', mid=m.id) }}"
             onsubmit="return confirmerSuppression('Supprimer ce mouvement ?')" style="margin:0">

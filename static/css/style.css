@@ -1529,3 +1529,12 @@ body.theme-sombre .interrupteur.on,
   body.rail .nav a, body.rail .sidebar-pied a, body.rail .bascule-theme { padding: 0; }
   body.rail .nav .sous-nav a { padding-left: 0; }
 }
+
+/* ------------------------------------- Consommation mensuelle (fiche article) */
+.barres-mois { display: flex; flex-direction: column; gap: 7px; }
+.barre-mois { display: flex; align-items: center; gap: 10px; font-size: .82rem; }
+.bm-lib { flex: 0 0 62px; color: var(--doux); font-variant-numeric: tabular-nums; }
+.bm-piste { flex: 1; height: 10px; border-radius: 99px; background: var(--vert-05); overflow: hidden; }
+.bm-piste i { display: block; height: 100%; border-radius: 99px; background: var(--vert); }
+.bm-val { flex: 0 0 auto; min-width: 46px; text-align: right; font-weight: 600; color: var(--encre);
+          font-variant-numeric: tabular-nums; }
