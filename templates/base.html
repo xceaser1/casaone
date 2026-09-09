@@ -255,6 +255,66 @@
         <h1>{% block entete %}{{ self.titre() }}{% endblock %}</h1>
         <small>{% block sous_entete %}{% endblock %}</small>
       </div>
+      {# Outils de la barre du haut : meteo du chantier, heure, notifications.
+         Trois informations qui n'appartiennent a aucune page en particulier et
+         qu'on veut sous les yeux en permanence. #}
+      <div class="outils">
+        {# Meteo : remplie par le navigateur depuis /api/meteo (le serveur
+           interroge le fournisseur, la CSP interdisant l'appel depuis la page).
+           Masquee tant qu'on ne sait rien : afficher un emplacement vide ferait
+           croire a une panne. #}
+        <div class="outil meteo" id="outil-meteo" hidden>
+          <span class="meteo-ic" id="meteo-ic"></span>
+          <span class="outil-txt">
+            <b id="meteo-temp">—</b>
+            <small id="meteo-lib"></small>
+          </span>
+        </div>
+
+        {# Heure de l'appareil, pas du serveur : c'est celle que porte la montre
+           de la personne, et celle qui datera ses pointages hors ligne. #}
+        <div class="outil horloge" id="outil-horloge" title="Heure de cet appareil">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 1.9"/>
+          </svg>
+          <span class="outil-txt"><b id="horloge-heure">--:--</b></span>
+        </div>
+
+        {% set alertes = entete_alertes() %}
+        <details class="cloche" id="cloche">
+          <summary title="Notifications" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/>
+              <path d="M10.3 20a2 2 0 0 0 3.4 0"/>
+            </svg>
+            {% if alertes %}<span class="cloche-pastille">{{ alertes|length }}</span>{% endif %}
+          </summary>
+          <div class="cloche-menu">
+            <div class="cloche-tete">
+              Notifications
+              <small>ce qui attend une action</small>
+            </div>
+            {% for n in alertes %}
+            <a class="cloche-item t-{{ n.ton }}" href="{{ n.url }}">
+              <span class="cloche-ic">{{ ico(n.icone) }}</span>
+              <span class="cloche-txt">
+                <b>{{ n.titre }}</b>
+                <small>{{ n.detail }}</small>
+              </span>
+            </a>
+            {% endfor %}
+            {% if not alertes %}
+            <div class="cloche-vide">Rien à signaler.</div>
+            {% endif %}
+            <div class="cloche-pied">
+              Cette liste se vide quand le travail est fait, pas quand on l'a lue.
+            </div>
+          </div>
+        </details>
+      </div>
+
       <div class="compte">
         <div class="compte-infos">
           <b>{{ current_user.nom_complet or current_user.username }}</b>
@@ -264,6 +324,55 @@
         <a class="btn mini" href="{{ url_for('auth.logout') }}" title="Se déconnecter">{{ ico('sortie') }}</a>
       </div>
     </header>
+
+    {# Barre de reperes : les chiffres qui declenchent une action (presents,
+       demandes en attente, articles sous le seuil) vivaient chacun sur sa
+       propre page. Les remonter ici les rend visibles sans avoir a aller les
+       chercher. Chaque tuile mene a l'ecran qui permet d'agir. #}
+    {% set reperes = entete_infos() %}
+    {% if reperes %}
+    <div class="barre-infos" aria-label="Repères du chantier">
+      {% for r in reperes %}
+      {% if r.url %}
+      <a class="bi-tuile t-{{ r.ton }}" href="{{ r.url }}">
+      {% else %}
+      <div class="bi-tuile t-{{ r.ton }}">
+      {% endif %}
+        <span class="bi-ic">{{ ico(r.icone) }}</span>
+        <span class="bi-txt">
+          <span class="bi-lib">{{ r.libelle }}</span>
+          {% if r.get('court') %}
+          <span class="bi-val"><span class="bi-large">{{ r.valeur }}</span><span class="bi-etroit">{{ r.court }}</span></span>
+          {% else %}
+          <span class="bi-val">{{ r.valeur }}</span>
+          {% endif %}
+          <span class="bi-note">{{ r.note }}</span>
+          {% if r.get('jauge') is not none %}
+          <span class="bi-jauge" aria-hidden="true"><i style="width:{{ r.jauge }}%"></i></span>
+          {% endif %}
+        </span>
+      {% if r.url %}</a>{% else %}</div>{% endif %}
+      {% endfor %}
+
+      {# Etat du reseau : rempli par le navigateur, jamais par le serveur — une
+         page mise en cache mentirait sur la connexion au moment de l'affichage.
+         Masquee tant que tout va bien : une tuile permanente « en ligne »
+         n'apprend rien et occupe la place des chiffres utiles. #}
+      <div class="bi-tuile bi-reseau" id="bi-reseau" hidden>
+        <span class="bi-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20h.01"/><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/>
+          </svg>
+        </span>
+        <span class="bi-txt">
+          <span class="bi-lib">Connexion</span>
+          <span class="bi-val" id="bi-reseau-val">Hors ligne</span>
+          <span class="bi-note" id="bi-reseau-note">saisies conservées sur l'appareil</span>
+        </span>
+      </div>
+    </div>
+    {% endif %}
 
     <main class="contenu">
       {% with messages = get_flashed_messages(with_categories=true) %}
