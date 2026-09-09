@@ -13,6 +13,7 @@ from models.livraison import Livraison
 from models.metier import Betonnage, Niveau, Surface, Zone
 from services import export as svc_export
 from services import kpi as svc_kpi
+from services import meteo as svc_meteo
 from services import kpi_livraison as svc_liv
 from services import kpi_engin as svc_eng
 from services import kpi_mainoeuvre as svc_mo
@@ -38,6 +39,26 @@ def _verifier_table(cle):
 # --------------------------------------------------------------------------
 # Dashboard / diagrammes
 # --------------------------------------------------------------------------
+@bp.route("/meteo")
+@login_required
+def meteo():
+    """Meteo de la ville du projet actif.
+
+    Passe par le serveur : la CSP interdit a la page d'appeler un service
+    externe. Seules des coordonnees sortent — aucune donnee d'utilisateur.
+    Indisponible (reseau du chantier coupe, fournisseur en panne) n'est pas une
+    erreur applicative : la barre du haut n'affiche alors rien.
+    """
+    from models.projet import Projet
+
+    projet = Projet.query.get(projet_actif_id())
+    valeur = svc_meteo.releve(projet.ville if projet else None)
+    if valeur is None:
+        return jsonify({"disponible": False}), 200
+    valeur["disponible"] = True
+    return jsonify(valeur)
+
+
 @bp.route("/dashboard")
 @login_required
 @exige("dashboard")

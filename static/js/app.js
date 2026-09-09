@@ -328,3 +328,120 @@ const AXE_SOBRE = {
   ticks: { padding: 8 }
 };
 const AXE_NU = { grid: { display: false }, border: { display: false }, ticks: { padding: 6 } };
+
+/* ------------------------------------- Barre de reperes : etat du reseau
+   La seule tuile que le serveur ne peut pas remplir : une page rendue en
+   ligne puis relue depuis le cache afficherait une connexion qui n'existe
+   plus. Elle reste masquee tant que tout va bien — une tuile permanente
+   « en ligne » n'apprend rien et prend la place des chiffres utiles. */
+(function () {
+  const tuile = document.getElementById('bi-reseau');
+  if (!tuile) return;
+
+  const valeur = document.getElementById('bi-reseau-val');
+  const note = document.getElementById('bi-reseau-note');
+
+  function enAttente() {
+    if (typeof FileAttente === 'undefined') return Promise.resolve(0);
+    return FileAttente.compter().catch(() => 0);
+  }
+
+  function rafraichir() {
+    return enAttente().then(n => {
+      const horsLigne = !navigator.onLine;
+      if (!horsLigne && !n) { tuile.hidden = true; return; }
+
+      tuile.hidden = false;
+      tuile.classList.toggle('en-attente', !horsLigne);
+      if (horsLigne) {
+        valeur.textContent = 'Hors ligne';
+        note.textContent = n
+          ? n + (n > 1 ? ' saisies conservées' : ' saisie conservée')
+          : 'saisies conservées sur l’appareil';
+      } else {
+        valeur.textContent = 'Envoi en cours';
+        note.textContent = n + (n > 1 ? ' saisies à transmettre' : ' saisie à transmettre');
+      }
+    });
+  }
+
+  window.addEventListener('online', rafraichir);
+  window.addEventListener('offline', rafraichir);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) rafraichir();
+  });
+  // La file se vide en arriere-plan (envoi immediat ou Background Sync) sans
+  // prevenir la page : on la relit periodiquement. Un COUNT IndexedDB local,
+  // donc sans reseau ni serveur.
+  setInterval(rafraichir, 30000);
+  rafraichir();
+})();
+
+/* ------------------------------------------- Horloge de la barre du haut
+   L'heure de l'APPAREIL, pas celle du serveur : c'est celle que porte la
+   montre de la personne, et celle qui datera ses pointages hors ligne. On se
+   recale sur le debut de la minute suivante plutot que de battre toutes les
+   secondes — une horloge qui n'affiche pas les secondes n'a rien a y gagner. */
+(function () {
+  const cible = document.getElementById('horloge-heure');
+  if (!cible) return;
+
+  function afficher() {
+    const d = new Date();
+    cible.textContent = String(d.getHours()).padStart(2, '0') + ':'
+                      + String(d.getMinutes()).padStart(2, '0');
+    const restant = (60 - d.getSeconds()) * 1000 - d.getMilliseconds();
+    setTimeout(afficher, Math.max(1000, restant));
+  }
+  afficher();
+  // Un telephone met l'onglet en veille : au retour, l'heure affichee est
+  // fausse tant que le minuteur n'a pas repris.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) afficher(); });
+})();
+
+/* -------------------------------------------- Meteo de la barre du haut
+   Le serveur interroge le fournisseur et met en cache ; la page ne fait qu'un
+   appel a sa propre origine. Indisponible n'est pas une erreur : la tuile
+   reste simplement masquee. */
+(function () {
+  const bloc = document.getElementById('outil-meteo');
+  if (!bloc) return;
+
+  const DESSINS = {
+    'soleil': '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>',
+    'soleil-nuage': '<circle cx="8.5" cy="8" r="3"/><path d="M8.5 2.5v1.4M3.5 8H2.1M4.9 4.4 3.9 3.4M12.1 4.4l1-1"/><path d="M17.5 12.5a3.5 3.5 0 0 1 0 7H8a4 4 0 0 1 0-8 5 5 0 0 1 9.5 1z"/>',
+    'nuage': '<path d="M17.5 10.5a4 4 0 0 1 0 8H8a4.5 4.5 0 0 1 0-9 5.5 5.5 0 0 1 9.5 1z"/>',
+    'brume': '<path d="M17.5 8.5a4 4 0 0 1 0 8H8a4.5 4.5 0 0 1 0-9 5.5 5.5 0 0 1 9.5 1z"/><path d="M4 20h6M14 20h6"/>',
+    'pluie': '<path d="M17.5 7.5a4 4 0 0 1 0 8H8a4.5 4.5 0 0 1 0-9 5.5 5.5 0 0 1 9.5 1z"/><path d="M8 18.5 7 21M12 18.5 11 21M16 18.5 15 21"/>',
+    'neige': '<path d="M17.5 7.5a4 4 0 0 1 0 8H8a4.5 4.5 0 0 1 0-9 5.5 5.5 0 0 1 9.5 1z"/><path d="M8 19.5v.01M12 19.5v.01M16 19.5v.01M10 21.5v.01M14 21.5v.01"/>',
+    'orage': '<path d="M17.5 6.5a4 4 0 0 1 0 8H8a4.5 4.5 0 0 1 0-9 5.5 5.5 0 0 1 9.5 1z"/><path d="m13 15-3 4h3l-1.5 3.5"/>'
+  };
+
+  function dessiner(nom) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+         + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+         + (DESSINS[nom] || DESSINS.nuage) + '</svg>';
+  }
+
+  fetch('/api/meteo', { headers: { 'Accept': 'application/json' } })
+    .then(r => (r.ok ? r.json() : null))
+    .then(m => {
+      if (!m || !m.disponible) return;
+      const ic = document.getElementById('meteo-ic');
+      ic.className = 'meteo-ic ' + m.icone;
+      ic.innerHTML = dessiner(m.icone);
+      document.getElementById('meteo-temp').textContent = m.temperature + ' °C';
+      document.getElementById('meteo-lib').textContent = m.libelle + ' · ' + m.ville;
+      bloc.title = m.libelle + ' à ' + m.ville + ' — ' + m.mini + '/' + m.maxi
+                 + ' °C, vent ' + m.vent + ' km/h';
+      bloc.hidden = false;
+    })
+    .catch(() => { /* hors ligne : la meteo reste masquee */ });
+})();
+
+/* Un seul menu ouvert a la fois dans la barre du haut : cliquer ailleurs
+   referme la cloche, comme pour le selecteur de projet. */
+document.addEventListener('click', (e) => {
+  const cloche = document.getElementById('cloche');
+  if (cloche && cloche.open && !cloche.contains(e.target)) cloche.open = false;
+});

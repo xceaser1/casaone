@@ -343,39 +343,46 @@ def _enregistrer_contexte(app):
                 choisi = session.get("projet_id")
                 projet_actif = next((p for p in projets if p.id == choisi), None) or projets[0]
 
-        def presents_aujourdhui():
-            """Nombre d'ouvriers pointes en entree ce jour, pour la pastille du menu.
+        # Les pastilles du menu et la barre d'informations affichent les memes
+        # compteurs : ils passent par le meme service, qui les memorise pour la
+        # duree de la requete. Sans cela chaque page ferait deux fois la requete.
+        from services import entete as svc_entete
 
-            Simple COUNT sur un index existant (projet + jour) : appele une fois
-            par rendu de page, le cout est negligeable. Renvoie 0 des que
-            l'utilisateur n'a pas acces au pointage.
-            """
+        def presents_aujourdhui():
+            """Ouvriers pointes en entree ce jour, pour la pastille du menu."""
             if projet_actif is None or not peut("pointage"):
                 return 0
-            from datetime import date
-            from models.presence import Presence
-            return Presence.query.filter_by(
-                projet_id=projet_actif.id, jour=date.today(), type="entree"
-            ).count()
+            return svc_entete.presents(projet_actif.id)
 
         def demandes_a_traiter():
-            """Demandes en attente de decision, pour la pastille du menu.
-
-            Un simple COUNT sur un index existant, et zero des que
-            l'utilisateur n'a pas acces au module.
-            """
+            """Demandes en attente de decision, pour la pastille du menu."""
             if projet_actif is None or not peut("demandes"):
                 return 0
-            from models.demande import Demande
-            return Demande.query.filter_by(
-                projet_id=projet_actif.id, statut="soumise"
-            ).count()
+            return svc_entete.demandes_en_attente(projet_actif.id)
+
+        def entete_alertes():
+            """Notifications : ce qui attend une action (voir services/entete.py)."""
+            if not current_user.is_authenticated or projet_actif is None:
+                return []
+            return svc_entete.notifications(
+                projet_actif.id, peut, url_for, current_user.username
+            )
+
+        def entete_infos():
+            """Reperes de la barre d'informations (voir services/entete.py)."""
+            if not current_user.is_authenticated:
+                return []
+            return svc_entete.infos(
+                projet_actif.id if projet_actif else None, peut, url_for
+            )
 
         return {
             "peut": peut,
             "statique": statique,
             "presents_aujourdhui": presents_aujourdhui,
             "demandes_a_traiter": demandes_a_traiter,
+            "entete_infos": entete_infos,
+            "entete_alertes": entete_alertes,
             "projet_nom": projet_actif.nom if projet_actif else app.config["PROJET_NOM"],
             "societe": app.config["SOCIETE"],
             "projet_actif": projet_actif,
