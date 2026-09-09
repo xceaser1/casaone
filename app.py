@@ -16,6 +16,7 @@ from models import metier as _metier_models  # noqa: F401
 from models import presence as _presence_models  # noqa: F401  (enregistre la table presences)
 from models import stock as _stock_models  # noqa: F401  (depots, articles, mouvements)
 from models import demande as _demande_models  # noqa: F401  (demandes d'approvisionnement)
+from models import agenda as _agenda_models  # noqa: F401  (evenements du calendrier)
 from models.projet import Projet
 
 login_manager = LoginManager()
@@ -52,6 +53,7 @@ def creer_app(config_class=Config):
     from routes.stock_routes import bp as stock_bp
     from routes.mobile_routes import bp as mobile_bp
     from routes.demande_routes import bp as demandes_bp
+    from routes.agenda_routes import bp as agenda_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(pages_bp)
@@ -62,6 +64,7 @@ def creer_app(config_class=Config):
     app.register_blueprint(stock_bp)
     app.register_blueprint(mobile_bp)
     app.register_blueprint(demandes_bp)
+    app.register_blueprint(agenda_bp)
 
     _enregistrer_contexte(app)
     _enregistrer_erreurs(app)
@@ -496,6 +499,12 @@ def initialiser_referentiel_droits():
                 ),
                 # Projets : lecture seule pour les utilisateurs (gestion = admin).
                 db.and_(Permission.module == "projets", Permission.action.in_(["view", "export"])),
+                # Agenda : les conducteurs y posent reunions et jalons. Un
+                # calendrier que seul l'admin peut remplir ne sert a personne.
+                db.and_(
+                    Permission.module == "agenda",
+                    Permission.action.in_(["view", "create", "edit", "delete", "export"]),
+                ),
             )
         ).all()
         ajout = [p for p in manquantes if p.code not in codes_actuels]

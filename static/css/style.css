@@ -49,6 +49,13 @@
 }
 * { box-sizing: border-box; }
 
+/* L'attribut `hidden` du HTML doit toujours gagner. La regle du navigateur
+   ([hidden] { display: none }) a la meme specificite qu'une classe et arrive
+   avant : `.btn { display: inline-flex }` suffit a la faire sauter, et le
+   bouton reste visible alors que le script le croit masque. Le bug est
+   silencieux — d'ou cette regle unique, plutot qu'un correctif par composant. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0; padding: 0;
   font-family: var(--police);
@@ -1569,10 +1576,6 @@ body.theme-sombre .interrupteur.on,
   color: inherit; text-decoration: none;
   transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
-/* `display: flex` ci-dessus l'emporte sur la regle [hidden] du navigateur, de
-   meme specificite mais anterieure : sans cette ligne la tuile reseau afficherait
-   « Hors ligne » en permanence, y compris connecte. */
-.bi-tuile[hidden] { display: none; }
 a.bi-tuile:hover {
   transform: translateY(-1px);
   border-color: var(--bord-fort);
@@ -1662,7 +1665,6 @@ body.theme-sombre a.bi-tuile:hover { background: rgba(255,255,255,.09); }
   border: 1px solid var(--bord);
   background: var(--fond);
 }
-.outil[hidden] { display: none; }         /* sinon `display: flex` l'emporte */
 .outil svg, .meteo-ic svg { width: 17px; height: 17px; color: var(--doux); }
 .outil-txt { display: flex; flex-direction: column; line-height: 1.15; }
 .outil-txt b { font-size: .82rem; color: var(--encre); font-variant-numeric: tabular-nums; }
@@ -1733,10 +1735,15 @@ body.theme-sombre a.bi-tuile:hover { background: rgba(255,255,255,.09); }
 }
 
 @media (max-width: 900px) {
-  /* La largeur est comptee : on garde la cloche (elle porte une action) et on
-     laisse tomber la meteo et l'heure, que le telephone affiche deja lui-meme. */
+  /* La largeur est comptee. L'heure part : le telephone affiche deja la sienne
+     en haut de l'ecran. La meteo reste — c'est sur le chantier, telephone en
+     main, qu'elle sert le plus : une averse annulee ou non change un coulage.
+     Elle se reduit a l'icone et a la temperature. */
   .outils { margin-right: 8px; gap: 6px; }
-  .outil { display: none; }
+  .horloge { display: none; }
+  .outil { padding: 4px 9px; gap: 6px; }
+  .meteo .outil-txt small { display: none; }
+  .outil-txt b { font-size: .78rem; }
   /* Ancre le menu sur l'ecran et non sur la cloche : celle-ci n'est pas au
      bord droit (avatar et deconnexion la suivent), et le panneau debordait
      donc a gauche de la fenetre. */
@@ -1752,3 +1759,110 @@ body.theme-sombre .outil,
 body.theme-sombre .cloche > summary { background: rgba(255,255,255,.06); border-color: var(--bord); }
 body.theme-sombre .cloche-menu { background: #1a2238; border-color: var(--bord); }
 body.theme-sombre .cloche-pastille { border-color: #1a2238; }
+
+/* ================================================== Calendrier du chantier
+   Grille de sept colonnes. Les cases gardent une hauteur minimale : un mois
+   dont les lignes changent de hauteur selon leur remplissage se lit mal, et
+   la position d'une date devient imprevisible d'un mois a l'autre. */
+.cal-enveloppe { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.cal-carte { overflow: hidden; }
+.cal-tete { flex-wrap: wrap; gap: 10px; }
+.cal-nav { display: flex; align-items: center; gap: 10px; }
+.cal-nav h3 { margin: 0; min-width: 168px; }
+.cal-legende { display: flex; flex-wrap: wrap; gap: 6px; }
+.cal-pastille {
+  font-size: .68rem; padding: 3px 9px; border-radius: 99px;
+  background: var(--fond); color: var(--doux); border: 1px solid var(--bord);
+}
+.cal-pastille::before {
+  content: ""; display: inline-block; width: 7px; height: 7px;
+  border-radius: 50%; margin-right: 6px; background: currentColor;
+}
+.cal-pastille.c-vert   { color: #16a34a; }
+.cal-pastille.c-bleu   { color: var(--bleu); }
+.cal-pastille.c-ambre  { color: var(--ambre); }
+.cal-pastille.c-cyan   { color: var(--cyan); }
+.cal-pastille.c-violet { color: var(--violet); }
+
+.cal-grille {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--bord);
+}
+.cal-entete {
+  padding: 8px 10px; font-size: .68rem; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--doux);
+  border-bottom: 1px solid var(--bord); text-align: center;
+}
+.cal-case {
+  min-height: 108px; padding: 5px 6px 7px;
+  border-right: 1px solid var(--bord); border-bottom: 1px solid var(--bord);
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+}
+.cal-case:nth-child(7n) { border-right: 0; }
+.cal-case.week-end, .cal-entete.week-end { background: rgba(0,0,0,.02); }
+/* Les jours des mois voisins restent visibles mais s'effacent : la semaine
+   doit rester entiere sans que l'oeil les confonde avec le mois affiche. */
+.cal-case.hors-mois { opacity: .45; }
+.cal-case.aujourdhui { background: var(--vert-05); box-shadow: inset 0 0 0 2px var(--vert); }
+
+.cal-jour { display: flex; align-items: center; justify-content: space-between; }
+.cal-num { font-size: .8rem; font-weight: 700; color: var(--encre); font-variant-numeric: tabular-nums; }
+.cal-case.aujourdhui .cal-num { color: var(--vert-fonce); }
+.cal-ajout {
+  width: 20px; height: 20px; border-radius: 6px; border: 0; cursor: pointer;
+  background: transparent; color: var(--doux); font-size: 1rem; line-height: 1;
+  opacity: 0; transition: opacity .12s ease;
+}
+.cal-case:hover .cal-ajout { opacity: 1; }
+.cal-ajout:hover { background: var(--vert-10); color: var(--vert-fonce); }
+
+.cal-items { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cal-item {
+  display: block; width: 100%; text-align: left;
+  font-size: .72rem; line-height: 1.25;
+  padding: 3px 6px; border-radius: 6px; border: 0; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-decoration: none; font-family: inherit;
+  background: var(--fond); color: var(--texte);
+  border-left: 3px solid var(--bord-fort);
+}
+.cal-item b { font-weight: 700; font-variant-numeric: tabular-nums; }
+a.cal-item:hover, button.cal-item:hover { filter: brightness(.96); }
+.cal-item.c-vert   { background: #eaf7ef; color: #12693c; border-left-color: #16a34a; }
+.cal-item.c-bleu   { background: var(--bleu-10);   color: #1a5c9e; border-left-color: var(--bleu); }
+.cal-item.c-ambre  { background: var(--ambre-10);  color: #96590c; border-left-color: var(--ambre); }
+.cal-item.c-rouge  { background: var(--rouge-10);  color: #9e2f24; border-left-color: var(--rouge); }
+.cal-item.c-cyan   { background: var(--cyan-10);   color: #0f6f6f; border-left-color: var(--cyan); }
+.cal-item.c-violet { background: var(--violet-10); color: #4c37a0; border-left-color: var(--violet); }
+.cal-item.c-gris   { background: var(--fond); color: var(--texte); border-left-color: var(--doux); }
+.cal-reste { font-size: .68rem; color: var(--doux); padding-left: 6px; }
+
+.pres-av.c-vert   { background: #eaf7ef; color: #12693c; }
+.pres-av.c-bleu   { background: var(--bleu-10);   color: #1a5c9e; }
+.pres-av.c-ambre  { background: var(--ambre-10);  color: #96590c; }
+.pres-av.c-rouge  { background: var(--rouge-10);  color: #9e2f24; }
+.pres-av.c-cyan   { background: var(--cyan-10);   color: #0f6f6f; }
+.pres-av.c-violet { background: var(--violet-10); color: #4c37a0; }
+
+@media (max-width: 1200px) {
+  .cal-enveloppe { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  /* Sept colonnes sur un telephone donnent des cases de 45 px : illisibles.
+     La grille defile horizontalement, la semaine restant d'un seul tenant. */
+  .cal-carte { overflow-x: auto; }
+  .cal-grille { min-width: 680px; }
+  .cal-case { min-height: 92px; }
+  .cal-nav h3 { min-width: 0; font-size: 1rem; }
+}
+
+body.theme-sombre .cal-case.week-end,
+body.theme-sombre .cal-entete.week-end { background: rgba(255,255,255,.03); }
+body.theme-sombre .cal-case.aujourdhui { background: rgba(59,130,246,.12); }
+body.theme-sombre .cal-item.c-vert   { background: rgba(22,163,74,.18);  color: #86e0aa; }
+body.theme-sombre .cal-item.c-bleu   { background: rgba(47,127,212,.18); color: #9ecbf5; }
+body.theme-sombre .cal-item.c-ambre  { background: rgba(224,138,30,.18); color: #f2c47c; }
+body.theme-sombre .cal-item.c-rouge  { background: rgba(217,84,72,.18);  color: #f0a49b; }
+body.theme-sombre .cal-item.c-cyan   { background: rgba(27,163,163,.18); color: #85dede; }
+body.theme-sombre .cal-item.c-violet { background: rgba(122,92,214,.20); color: #c4b2f5; }
+body.theme-sombre .cal-item.c-gris   { background: rgba(255,255,255,.06); color: var(--texte); }
