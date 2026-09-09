@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block titre %}Calendrier{% endblock %}
+{% block sous_entete %}{{ cal.libelle|capitalize }} — {{ projet_actif.nom if projet_actif else projet_nom }}{% endblock %}
+
+{% block contenu %}
+<div class="presences-barre">
+  <p class="badges-info">
+    Le calendrier lit les dates <b>là où elles vivent</b> — coulages, livraisons,
+    échéances de demandes, comptages — plutôt que d'en garder une copie qui
+    finirait par diverger. Seuls réunions, jalons et visites y sont saisis.
+  </p>
+  <div class="presences-actions">
+    {% if peut('agenda', 'create') %}
+    <button class="btn btn-fonce" onclick="agendaNouveau()">{{ ico('plus') }} Nouvel événement</button>
+    {% endif %}
+    <a class="btn" href="{{ url_for('agenda.index') }}">Aujourd'hui</a>
+  </div>
+</div>
+
+<div class="cal-enveloppe">
+  <div class="carte cal-carte">
+    <div class="carte-tete cal-tete">
+      <div class="cal-nav">
+        <a class="btn mini" title="Mois précédent"
+           href="{{ url_for('agenda.index', annee=cal.precedent[0], mois=cal.precedent[1]) }}">‹</a>
+        <h3>{{ cal.libelle|capitalize }}</h3>
+        <a class="btn mini" title="Mois suivant"
+           href="{{ url_for('agenda.index', annee=cal.suivant[0], mois=cal.suivant[1]) }}">›</a>
+      </div>
+      <div class="cal-legende">
+        {% if cal.comptes.get('coulage') %}<span class="cal-pastille c-vert">Coulages</span>{% endif %}
+        {% if cal.comptes.get('livraison') %}<span class="cal-pastille c-bleu">Livraisons</span>{% endif %}
+        {% if cal.comptes.get('demande') %}<span class="cal-pastille c-ambre">Échéances</span>{% endif %}
+        {% if cal.comptes.get('inventaire') %}<span class="cal-pastille c-cyan">Comptages</span>{% endif %}
+        {% if cal.comptes.get('evenement') %}<span class="cal-pastille c-violet">Événements</span>{% endif %}
+      </div>
+    </div>
+
+    <div class="cal-grille" role="grid">
+      {% for j in jours %}
+      <div class="cal-entete{{ ' week-end' if loop.index0 > 4 }}">{{ j }}</div>
+      {% endfor %}
+
+      {% for semaine in cal.semaines %}
+        {% for jour in semaine %}
+        {% set items = cal.index.get(jour, []) %}
+        <div class="cal-case{{ ' hors-mois' if jour.month != cal.mois }}{{ ' week-end' if jour.weekday() > 4 }}{{ ' aujourdhui' if jour == cal.aujourdhui }}"
+             data-jour="{{ jour.isoformat() }}">
+          <div class="cal-jour">
+            <span class="cal-num">{{ jour.day }}</span>
+            {% if peut('agenda', 'create') %}
+            <button type="button" class="cal-ajout" title="Ajouter un événement le {{ jour.strftime('%d/%m') }}"
+                    onclick="agendaNouveau('{{ jour.isoformat() }}')">+</button>
+            {% endif %}
+          </div>
+          <div class="cal-items">
+            {% for it in items[:4] %}
+              {% if it.url %}
+              <a class="cal-item c-{{ it.couleur }}" href="{{ it.url }}"
+                 title="{{ it.titre }} — {{ it.detail }}">
+                {% if it.heure %}<b>{{ it.heure }}</b> {% endif %}{{ it.titre }}
+              </a>
+              {% elif it.source == 'evenement' and peut('agenda', 'edit') %}
+              <button type="button" class="cal-item c-{{ it.couleur }}"
+                      title="{{ it.titre }} — {{ it.detail }}"
+                      onclick="agendaOuvrir({{ it.id }})">
+                {% if it.heure %}<b>{{ it.heure }}</b> {% endif %}{{ it.titre }}
+              </button>
+              {% else %}
+              <span class="cal-item c-{{ it.couleur }}" title="{{ it.titre }} — {{ it.detail }}">
+                {% if it.heure %}<b>{{ it.heure }}</b> {% endif %}{{ it.titre }}
+              </span>
+              {% endif %}
+            {% endfor %}
+            {% if items|length > 4 %}
+            <span class="cal-reste">+{{ items|length - 4 }} autre{{ 's' if items|length - 4 > 1 }}</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="carte cal-cote">
+    <div class="carte-tete"><h3>Prochaines échéances</h3></div>
+    <div class="pres-liste">
+      {% for p in prochains %}
+      {% set contenu %}
+        <span class="pres-av c-{{ p.couleur }}">{{ p.jour.day }}</span>
+        <div class="pres-info">
+          <b>{{ p.titre }}</b>
+          <small>
+            {{ p.jour.strftime('%d/%m') }}
+            {%- if p.heure %} · {{ p.heure }}{% endif %}
+            {%- if p.detail %} · {{ p.detail }}{% endif %}
+          </small>
+        </div>
+      {% endset %}
+      {% if p.url %}
+      <a class="pres-c" href="{{ p.url }}" style="text-decoration:none;color:inherit">{{ contenu }}</a>
+      {% else %}
+      <div class="pres-c">{{ contenu }}</div>
+      {% endif %}
+      {% endfor %}
+      {% if not prochains %}
+      <div class="pres-vide">Rien de prévu dans les quinze prochains jours.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if peut('agenda', 'create') or peut('agenda', 'edit') %}
+{# Une seule modale sert a creer et a modifier : deux formulaires jumeaux
+   finissent toujours par diverger sur un champ. L'action du formulaire est
+   recalculee a l'ouverture. #}
+<div class="modale-fond" id="m-evenement">
+  <form class="modale" method="post" id="f-evenement" action="{{ url_for('agenda.creer') }}">
+    <h3 id="ev-titre-modale">Nouvel événement</h3>
+    <div class="corps">
+      <input type="hidden" name="retour_annee" value="{{ cal.annee }}">
+      <input type="hidden" name="retour_mois" value="{{ cal.mois }}">
+      <div class="form-grille">
+        <label class="champ" style="grid-column:1/-1"><span>Titre</span>
+          <input name="titre" id="ev-titre" maxlength="160" required
+                 placeholder="Réunion de chantier, visite du BET, jalon..."></label>
+        <label class="champ"><span>Type</span>
+          <select name="type_evenement" id="ev-type">
+            {% for cle, lib in types %}<option value="{{ cle }}">{{ lib }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="champ"><span>Heure (facultatif)</span>
+          <input type="time" name="heure" id="ev-heure"></label>
+        <label class="champ"><span>Début</span>
+          <input type="date" name="debut" id="ev-debut" required></label>
+        <label class="champ"><span>Fin (si plusieurs jours)</span>
+          <input type="date" name="fin" id="ev-fin"></label>
+        <label class="champ" style="grid-column:1/-1"><span>Lieu</span>
+          <input name="lieu" id="ev-lieu" maxlength="120" placeholder="Bloc C, base vie, bureau..."></label>
+        <label class="champ" style="grid-column:1/-1"><span>Note</span>
+          <textarea name="description" id="ev-description" rows="3"></textarea></label>
+      </div>
+    </div>
+    <div class="pied">
+      {% if peut('agenda', 'delete') %}
+      <button type="button" class="btn mini btn-danger" id="ev-supprimer" hidden
+              onclick="agendaSupprimer()">Supprimer</button>
+      {% endif %}
+      <button type="button" class="btn" onclick="fermerModale('m-evenement')">Annuler</button>
+      <button class="btn btn-fonce" type="submit">Enregistrer</button>
+    </div>
+  </form>
+</div>
+
+{% if peut('agenda', 'delete') %}
+<form method="post" id="f-supprimer-ev" style="display:none">
+  <input type="hidden" name="retour_annee" value="{{ cal.annee }}">
+  <input type="hidden" name="retour_mois" value="{{ cal.mois }}">
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Les evenements modifiables sont serialises ici plutot que relus par une
+   requete : ils sont deja tous charges pour dessiner le mois, et un aller-retour
+   reseau a chaque clic rendrait la page inutilisable sur le reseau du chantier. */
+const EVENEMENTS = {{ evenements|tojson }};
+
+function agendaNouveau(jour) {
+  const f = document.getElementById('f-evenement');
+  if (!f) return;
+  f.action = "{{ url_for('agenda.creer') }}";
+  f.reset();
+  document.getElementById('ev-titre-modale').textContent = 'Nouvel événement';
+  document.getElementById('ev-debut').value = jour || "{{ aujourdhui.isoformat() }}";
+  const suppr = document.getElementById('ev-supprimer');
+  if (suppr) suppr.hidden = true;
+  ouvrirModale('m-evenement');
+}
+
+function agendaOuvrir(id) {
+  const e = EVENEMENTS[id];
+  if (!e) return;
+  const f = document.getElementById('f-evenement');
+  f.action = "{{ url_for('agenda.index') }}evenements/" + id;
+  document.getElementById('ev-titre-modale').textContent = 'Modifier l’événement';
+  document.getElementById('ev-titre').value = e.titre || '';
+  document.getElementById('ev-type').value = e.type || 'autre';
+  document.getElementById('ev-heure').value = e.heure || '';
+  document.getElementById('ev-debut').value = e.debut || '';
+  document.getElementById('ev-fin').value = e.fin || '';
+  document.getElementById('ev-lieu').value = e.lieu || '';
+  document.getElementById('ev-description').value = e.description || '';
+  const suppr = document.getElementById('ev-supprimer');
+  if (suppr) { suppr.hidden = false; suppr.dataset.id = id; }
+  ouvrirModale('m-evenement');
+}
+
+function agendaSupprimer() {
+  const suppr = document.getElementById('ev-supprimer');
+  const f = document.getElementById('f-supprimer-ev');
+  if (!suppr || !f) return;
+  if (!confirmerSuppression('Supprimer cet événement du calendrier ?')) return;
+  f.action = "{{ url_for('agenda.index') }}evenements/" + suppr.dataset.id + "/supprimer";
+  f.submit();
+}
+</script>
+{% endblock %}
