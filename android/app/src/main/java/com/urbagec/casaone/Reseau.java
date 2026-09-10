@@ -8,6 +8,7 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.cert.X509Certificate;
@@ -68,6 +69,56 @@ final class Reseau {
             co.setRequestProperty("Accept", "application/json");
             String cookies = CookieManager.getInstance().getCookie(base(c));
             if (cookies != null) co.setRequestProperty("Cookie", cookies);
+
+            if (co.getResponseCode() != 200) return null;
+            String type = co.getContentType();
+            // Une session expiree renvoie la page de connexion, pas du JSON.
+            if (type == null || !type.contains("json")) return null;
+
+            StringBuilder sb = new StringBuilder();
+            BufferedReader r = new BufferedReader(new InputStreamReader(co.getInputStream(), "UTF-8"));
+            String ligne;
+            while ((ligne = r.readLine()) != null) sb.append(ligne);
+            r.close();
+            return new JSONObject(sb.toString());
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            if (co != null) co.disconnect();
+        }
+    }
+
+    /**
+     * Poste un objet JSON et renvoie la reponse, ou null en cas d'echec.
+     *
+     * Le null couvre indistinctement le reseau absent, la session expiree et
+     * l'erreur serveur : dans les trois cas l'appelant doit GARDER ce qu'il
+     * voulait envoyer. Ne jamais interpreter un echec comme un envoi reussi —
+     * c'est ainsi qu'on perd des pointages.
+     */
+    static JSONObject postJson(Context c, String chemin, JSONObject corps) {
+        HttpURLConnection co = null;
+        try {
+            URL url = new URL(base(c) + chemin);
+            co = (HttpURLConnection) url.openConnection();
+
+            if (co instanceof HttpsURLConnection && adressePrivee(url.getHost())) {
+                appliquerCertificatChantier((HttpsURLConnection) co);
+            }
+
+            co.setRequestMethod("POST");
+            co.setDoOutput(true);
+            co.setConnectTimeout(10000);
+            co.setReadTimeout(15000);
+            co.setRequestProperty("Content-Type", "application/json");
+            co.setRequestProperty("Accept", "application/json");
+            String cookies = CookieManager.getInstance().getCookie(base(c));
+            if (cookies != null) co.setRequestProperty("Cookie", cookies);
+
+            OutputStream sortie = co.getOutputStream();
+            sortie.write(corps.toString().getBytes("UTF-8"));
+            sortie.flush();
+            sortie.close();
 
             if (co.getResponseCode() != 200) return null;
             String type = co.getContentType();

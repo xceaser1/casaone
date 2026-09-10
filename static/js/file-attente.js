@@ -52,6 +52,38 @@
 
   /* --------------------------------------------------------------- File */
 
+  /* ------------------------------------------- Miroir natif (coque Android)
+
+     Dans l'application Android, cette file ne se vide QUE si la page est
+     ouverte : Background Sync n'existe pas dans une WebView. La coque tient
+     donc une copie de ce qui est en attente et la vide en tache de fond,
+     application fermee.
+
+     Ces appels sont volontairement muets. Le natif n'est qu'un filet : s'il
+     est absent (navigateur ordinaire), indisponible ou en erreur, la file
+     IndexedDB reste la source de verite et rien n'est perdu. Un pointage
+     envoye deux fois est sans consequence — la table des presences porte une
+     contrainte unique (projet, jour, matricule, nom, type). */
+
+  function natif() {
+    try {
+      return (typeof CasaOneNatif !== 'undefined'
+              && typeof CasaOneNatif.enfiler === 'function') ? CasaOneNatif : null;
+    } catch (e) {
+      return null;                       // pas de pont dans le service worker
+    }
+  }
+
+  function prevenirNatifAjout(ligne) {
+    var n = natif();
+    if (n) { try { n.enfiler(JSON.stringify(ligne)); } catch (e) { } }
+  }
+
+  function prevenirNatifRetrait(uuids) {
+    var n = natif();
+    if (n) { try { n.retirer(JSON.stringify(uuids)); } catch (e) { } }
+  }
+
   /** Empile un pointage. `charge` est le corps qui sera poste au serveur. */
   function ajouter(charge) {
     var ligne = {
@@ -64,7 +96,7 @@
       if (charge[k] !== undefined) ligne[k] = charge[k];
     });
     return transaction(POINTAGES, 'readwrite', function (s) { return s.add(ligne); })
-      .then(function () { return ligne; });
+      .then(function () { prevenirNatifAjout(ligne); return ligne; });
   }
 
   function tous() {
@@ -81,7 +113,7 @@
     if (!uuids || !uuids.length) return Promise.resolve();
     return transaction(POINTAGES, 'readwrite', function (s) {
       uuids.forEach(function (u) { s.delete(u); });
-    });
+    }).then(function (r) { prevenirNatifRetrait(uuids); return r; });
   }
 
   /* ------------------------------------------------------------- Envoi */
