@@ -52,9 +52,16 @@ def meteo():
     from models.projet import Projet
 
     projet = Projet.query.get(projet_actif_id())
-    valeur = svc_meteo.releve(projet.ville if projet else None)
+    ville = projet.ville if projet else None
+    valeur = svc_meteo.releve(ville)
     if valeur is None:
-        return jsonify({"disponible": False}), 200
+        # La cause n'est donnee qu'aux administrateurs : un message d'erreur
+        # reseau decrit l'infrastructure du serveur. Elle evite de devoir
+        # deviner pourquoi la meteo reste vide en production.
+        corps = {"disponible": False}
+        if current_user.est_admin:
+            corps["raison"] = svc_meteo.derniere_erreur(ville)
+        return jsonify(corps), 200
     valeur["disponible"] = True
     return jsonify(valeur)
 
