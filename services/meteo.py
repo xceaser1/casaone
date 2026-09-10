@@ -58,7 +58,8 @@ VILLES = {
 VILLE_DEFAUT = "casablanca"
 
 DUREE_CACHE = 900          # 15 min : la meteo ne bouge pas plus vite que ca
-DELAI_RESEAU = 4           # secondes : jamais bloquer le rendu d'une page
+DUREE_CACHE_ECHEC = 120    # 2 min : un echec passager ne doit pas tenir un quart d'heure
+DELAI_RESEAU = 6           # secondes : jamais bloquer le rendu d'une page
 
 # Codes WMO renvoyes par le fournisseur -> libelle et famille d'icone.
 # Le regroupement est volontairement grossier : sur un chantier, ce qui compte
@@ -147,6 +148,7 @@ def releve(ville=None):
         garde = _cache.get(cle)
         if garde and time.time() - garde["a"] < DUREE_CACHE:
             return garde["v"]
+        _cache.pop(cle, None)
 
     try:
         brut = _interroger(lat, lon)
@@ -164,13 +166,34 @@ def releve(ville=None):
             "maxi": round(float((jour.get("temperature_2m_max") or [0])[0])),
             "mini": round(float((jour.get("temperature_2m_min") or [0])[0])),
         }
-    except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError, IndexError):
-        # Echec durable ou passager : on memorise brievement l'echec pour ne pas
-        # retenter a chaque page pendant une coupure.
+    except Exception as erreur:      # noqa: BLE001 — voir ci-dessous
+        # Toute panne est absorbee : reseau coupe, DNS bloque, fournisseur en
+        # rade, reponse inattendue. Une meteo est un agrement, jamais une raison
+        # de renvoyer une erreur a l'utilisateur.
+        #
+        # La raison est conservee : sans elle, « la meteo ne s'affiche pas » en
+        # production est indiagnosticable — on ne sait pas distinguer un reseau
+        # sortant bloque d'un fournisseur en panne.
         with _verrou:
-            _cache[cle] = {"a": time.time() - DUREE_CACHE + 60, "v": None}
+            _cache[cle] = {
+                "a": time.time() - DUREE_CACHE + DUREE_CACHE_ECHEC,
+                "v": None,
+                "erreur": type(erreur).__name__ + ": " + str(erreur)[:120],
+            }
         return None
 
     with _verrou:
         _cache[cle] = {"a": time.time(), "v": valeur}
     return valeur
+
+
+def derniere_erreur(ville=None):
+    """Pourquoi le dernier appel a echoue, ou None s'il a reussi.
+
+    Sert au diagnostic : reservee aux administrateurs par la route qui
+    l'expose, car un message d'erreur reseau decrit l'infrastructure.
+    """
+    (lat, lon), _ = coordonnees(ville)
+    with _verrou:
+        garde = _cache.get((round(lat, 2), round(lon, 2)))
+    return garde.get("erreur") if garde else None

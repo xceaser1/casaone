@@ -283,7 +283,10 @@
           <span class="outil-txt"><b id="horloge-heure">--:--</b></span>
         </div>
 
-        {% set alertes = entete_alertes() %}
+        {# Prefixe `entete_` : une variable posee ici vit dans le meme
+           contexte que le {% block contenu %} de la page, et un nom courant
+           ecraserait silencieusement ce que la route lui a passe. #}
+        {% set entete_notifs = entete_alertes() %}
         <details class="cloche" id="cloche">
           <summary title="Notifications" aria-label="Notifications">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
@@ -291,14 +294,14 @@
               <path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/>
               <path d="M10.3 20a2 2 0 0 0 3.4 0"/>
             </svg>
-            {% if alertes %}<span class="cloche-pastille">{{ alertes|length }}</span>{% endif %}
+            {% if entete_notifs %}<span class="cloche-pastille">{{ entete_notifs|length }}</span>{% endif %}
           </summary>
           <div class="cloche-menu">
             <div class="cloche-tete">
               Notifications
               <small>ce qui attend une action</small>
             </div>
-            {% for n in alertes %}
+            {% for n in entete_notifs %}
             <a class="cloche-item t-{{ n.ton }}" href="{{ n.url }}">
               <span class="cloche-ic">{{ ico(n.icone) }}</span>
               <span class="cloche-txt">
@@ -307,7 +310,7 @@
               </span>
             </a>
             {% endfor %}
-            {% if not alertes %}
+            {% if not entete_notifs %}
             <div class="cloche-vide">Rien à signaler.</div>
             {% endif %}
             <div class="cloche-pied">
@@ -331,10 +334,10 @@
        demandes en attente, articles sous le seuil) vivaient chacun sur sa
        propre page. Les remonter ici les rend visibles sans avoir a aller les
        chercher. Chaque tuile mene a l'ecran qui permet d'agir. #}
-    {% set reperes = entete_infos() %}
-    {% if reperes %}
+    {% set entete_reperes = entete_infos() %}
+    {% if entete_reperes %}
     <div class="barre-infos" aria-label="Repères du chantier">
-      {% for r in reperes %}
+      {% for r in entete_reperes %}
       {% if r.url %}
       <a class="bi-tuile t-{{ r.ton }}" href="{{ r.url }}">
       {% else %}
