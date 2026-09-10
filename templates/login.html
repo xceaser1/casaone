@@ -79,19 +79,98 @@
       pointer-events: none;
     }
 
+    /* ------------------------------------------- Scene de chantier animee
+       Dessinee en SVG plutot que posee en image : nette a toute taille, une
+       poignee de kilo-octets, et surtout modifiable. Elle se lit comme un
+       trace technique par-dessus la photo — la grue, un batiment qui monte
+       etage par etage, la poussiere qui derive.
+
+       Aucune ressource externe : la politique de securite de l'application
+       (CSP, img-src 'self') les interdit, et c'est tres bien ainsi. */
+    .auth-scene {
+      position: absolute; right: 0; bottom: 0;
+      width: min(470px, 88%); height: auto;
+      opacity: .58;
+      pointer-events: none;
+      color: #fff;
+      /* Fondu vers le haut : la scene doit s'eteindre dans le fond au lieu de
+         s'arreter net sur une ligne d'horizon qui n'existe pas. Elle passe
+         ainsi derriere le titre sans lui disputer la lecture. */
+      -webkit-mask-image: linear-gradient(to top, #000 74%, transparent 100%);
+              mask-image: linear-gradient(to top, #000 74%, transparent 100%);
+    }
+    .auth-scene .trait { fill: none; stroke: currentColor; stroke-width: 2;
+                         stroke-linecap: round; stroke-linejoin: round; }
+    .auth-scene .fin { stroke-width: 1.2; opacity: .75; }
+    .auth-scene .plein { fill: currentColor; }
+
+    /* La grue travaille : le chariot parcourt la fleche, le crochet descend
+       chercher sa charge et la remonte. Un cycle lent — une grue de chantier
+       ne se deplace pas vite, et une animation nerveuse fatiguerait. */
+    .grue-chariot { animation: chariot 16s ease-in-out infinite; }
+    @keyframes chariot {
+      0%, 8%    { transform: translateX(0); }
+      42%, 58%  { transform: translateX(-96px); }
+      92%, 100% { transform: translateX(0); }
+    }
+    .grue-cable { animation: cable 16s ease-in-out infinite; transform-origin: top center; }
+    @keyframes cable {
+      0%, 8%   { transform: scaleY(1); }
+      25%      { transform: scaleY(3.1); }
+      42%, 58% { transform: scaleY(1.15); }
+      75%      { transform: scaleY(3.1); }
+      92%, 100%{ transform: scaleY(1); }
+    }
+    .grue-charge { animation: charge 16s ease-in-out infinite; }
+    @keyframes charge {
+      0%, 8%   { transform: translateY(0); }
+      25%      { transform: translateY(64px); }
+      42%, 58% { transform: translateY(4px) translateX(-96px); }
+      75%      { transform: translateY(64px) translateX(-96px); }
+      92%, 100%{ transform: translateY(0); }
+    }
+    /* Balancement : une charge suspendue n'est jamais parfaitement immobile. */
+    .grue-balance { animation: balance 5.5s ease-in-out infinite; transform-origin: top center; }
+    @keyframes balance {
+      0%, 100% { transform: rotate(-1.6deg); }
+      50%      { transform: rotate(1.6deg); }
+    }
+
+    /* Le batiment monte, etage par etage, puis le cycle recommence : c'est
+       exactement ce que l'application mesure. */
+    .etage { opacity: 0; animation: etage-monte 14s ease-in-out infinite; }
+    @keyframes etage-monte {
+      0%, 4%   { opacity: 0; transform: translateY(10px); }
+      12%, 72% { opacity: 1; transform: translateY(0); }
+      86%, 100%{ opacity: 0; transform: translateY(0); }
+    }
+
+    /* Poussiere : de rares points qui derivent vers le haut. */
+    .poussiere { animation: derive 11s linear infinite; }
+    @keyframes derive {
+      0%   { opacity: 0; transform: translateY(0); }
+      15%  { opacity: .8; }
+      85%  { opacity: .5; }
+      100% { opacity: 0; transform: translateY(-120px); }
+    }
+
     .auth-marque, .auth-titre, .auth-stats { position: relative; z-index: 1; }
 
     .auth-marque {
-      display: flex; align-items: center; gap: 11px;
-      font-weight: 700; letter-spacing: .2em; font-size: .78rem; text-transform: uppercase;
+      display: flex; align-items: center; gap: 14px;
       animation: apparait .7s .05s both;
     }
-    .auth-marque .pastille {
-      width: 30px; height: 30px; border-radius: 9px;
-      background: rgba(255,255,255,.14);
-      border: 1px solid rgba(255,255,255,.28);
-      display: grid; place-items: center; letter-spacing: 0;
-      font-size: .9rem; backdrop-filter: blur(4px);
+    /* Le vrai logo URBAGEC, passe en blanc par le meme filtre que dans la
+       barre laterale : le vert de la marque disparaitrait sur ce bleu, et
+       poser un rectangle blanc derriere pour le sauver serait pire. */
+    .auth-logo {
+      height: 34px; width: auto; max-width: 190px; object-fit: contain;
+      filter: brightness(0) invert(1);
+    }
+    .auth-marque .baseline {
+      font-weight: 600; letter-spacing: .18em; font-size: .68rem; text-transform: uppercase;
+      color: rgba(255,255,255,.62);
+      padding-left: 14px; border-left: 1px solid rgba(255,255,255,.28);
     }
 
     .auth-titre { animation: apparait .7s .12s both; }
@@ -105,9 +184,13 @@
     .auth-titre p { color: rgba(255,255,255,.82); max-width: 40ch; margin-top: 14px; line-height: 1.5; }
 
     /* Coupe schématique : barres qui poussent au chargement */
-    .auth-coupe { display: flex; flex-direction: column-reverse; gap: 6px; margin: 30px 0; max-width: 460px; }
+    /* La coupe du projet (un trait par niveau, largeurs reelles) reste, mais
+       en retrait : la scene dessinee raconte deja le batiment qui monte, et
+       deux metaphores de meme force se seraient neutralisees. */
+    .auth-coupe { display: flex; flex-direction: column-reverse; gap: 4px; margin: 26px 0 0;
+                  max-width: 210px; opacity: .55; }
     .auth-coupe span {
-      height: 12px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; display: block;
+      height: 7px; border-radius: 3px; background: rgba(255,255,255,.10); overflow: hidden; display: block;
     }
     .auth-coupe span i {
       display: block; height: 100%; border-radius: 4px;
@@ -200,14 +283,28 @@
     @media (max-width: 860px) {
       .auth { grid-template-columns: 1fr; }
       .auth-visuel { padding: 40px 34px; min-height: 300px; }
+      /* Sur telephone le panneau visuel n'est qu'un bandeau : la scene y
+         tiendrait mal et volerait la place au formulaire. */
+      /* Le bandeau est bas : la scene y tient a condition de rester ENTIERE.
+         Elle debordait de 70 px et la grue se retrouvait coupee en deux. */
+      .auth-scene { width: min(250px, 58%); right: 8px; opacity: .34;
+                    -webkit-mask-image: none; mask-image: none; }
+      .auth-marque .baseline { display: none; }
+      .auth-logo { height: 28px; }
       .auth-titre h1 { font-size: 1.9rem; }
       .auth-coupe { display: none; }
       .auth-form { padding: 34px 26px 48px; }
     }
     @media (prefers-reduced-motion: reduce) {
       .auth-visuel, .auth-orbe, .auth-photo, .auth-coupe span i,
-      .auth-marque, .auth-titre, .auth-stats, .auth-carte, .auth-btn::after { animation: none !important; }
+      .auth-marque, .auth-titre, .auth-stats, .auth-carte, .auth-btn::after,
+      .grue-chariot, .grue-cable, .grue-charge, .grue-balance,
+      .etage, .poussiere { animation: none !important; }
       .auth-coupe span i { width: var(--w); }
+      /* Sans animation, les etages doivent rester visibles : ils font partie
+         du dessin, pas seulement de son mouvement. */
+      .etage { opacity: 1; }
+      .poussiere { opacity: .5; }
     }
   </style>
 </head>
@@ -221,8 +318,9 @@
     <span class="auth-orbe o3"></span>
 
     <div class="auth-marque">
-      <span class="pastille">◆</span>
-      <span>{{ societe }}</span>
+      <img class="auth-logo" src="{{ statique('images/logo_URBAGEC.png') }}"
+           alt="{{ societe }}" width="190" height="34">
+      <span class="baseline">Bâtiment &amp; travaux publics</span>
     </div>
 
     <div class="auth-titre">
@@ -235,6 +333,71 @@
         {% endfor %}
       </div>
     </div>
+
+    {# Scene de chantier : grue en travail, batiment qui monte, poussiere.
+       Purement decorative — aria-hidden, et rien ne depend d'elle. #}
+    <svg class="auth-scene" viewBox="0 0 520 330" aria-hidden="true" focusable="false">
+      <!-- Batiment acheve, en arriere-plan -->
+      <g opacity=".38">
+        <path class="trait fin" d="M18 330V196h74v134"/>
+        <path class="trait fin" d="M18 214h74M18 232h74M18 250h74M18 268h74M18 286h74M18 304h74M55 196v134"/>
+      </g>
+
+      <!-- Batiment en construction : les etages apparaissent l'un apres l'autre -->
+      <g>
+        <path class="trait" d="M150 330V150h132v180"/>
+        <g class="etage" style="animation-delay:0s">   <path class="trait fin" d="M150 312h132M216 312v18"/></g>
+        <g class="etage" style="animation-delay:.5s">  <path class="trait fin" d="M150 288h132M216 288v24"/></g>
+        <g class="etage" style="animation-delay:1s">   <path class="trait fin" d="M150 264h132M216 264v24"/></g>
+        <g class="etage" style="animation-delay:1.5s"> <path class="trait fin" d="M150 240h132M216 240v24"/></g>
+        <g class="etage" style="animation-delay:2s">   <path class="trait fin" d="M150 216h132M216 216v24"/></g>
+        <g class="etage" style="animation-delay:2.5s"> <path class="trait fin" d="M150 192h132M216 192v24"/></g>
+        <g class="etage" style="animation-delay:3s">   <path class="trait fin" d="M150 168h132M216 168v24"/></g>
+        <!-- Echafaudage sur la face droite -->
+        <g class="etage" style="animation-delay:3.4s" opacity=".8">
+          <path class="trait fin" d="M282 168v162M296 168v162M282 192h14M282 216h14M282 240h14M282 264h14M282 288h14M282 312h14"/>
+        </g>
+      </g>
+
+      <!-- Sol -->
+      <path class="trait" d="M0 330h520"/>
+
+      <!-- Grue a tour -->
+      <g>
+        <!-- Mat -->
+        <path class="trait" d="M372 330V96M398 330V96M372 316h26M372 292h26M372 268h26M372 244h26M372 220h26M372 196h26M372 172h26M372 148h26M372 124h26"/>
+        <path class="trait fin" d="M372 316l26-24M398 316l-26-24M372 268l26-24M398 268l-26-24M372 220l26-24M398 220l-26-24M372 172l26-24M398 172l-26-24M372 124l26-24M398 124l-26-24"/>
+        <!-- Cabine -->
+        <path class="trait" d="M398 96h20v20h-20z"/>
+        <!-- Contre-fleche et son lest -->
+        <path class="trait" d="M372 90h-58M372 78h-58v12"/>
+        <rect class="plein" x="314" y="78" width="16" height="22" rx="2" opacity=".7"/>
+        <!-- Fleche -->
+        <path class="trait" d="M398 90h118M398 78h118"/>
+        <path class="trait fin" d="M406 78l12 12M418 78l12 12M430 78l12 12M442 78l12 12M454 78l12 12M466 78l12 12M478 78l12 12M490 78l12 12"/>
+        <!-- Pointe et haubans -->
+        <path class="trait" d="M408 68V54l-30 24M408 54l100 24M408 54l-88 24"/>
+        <!-- Chariot, cable et charge : le trio qui travaille -->
+        <g class="grue-chariot" transform="translate(0,0)">
+          <path class="trait" d="M486 90h16v8h-16z"/>
+          <path class="trait fin grue-cable" d="M494 98v22"/>
+        </g>
+        <g class="grue-charge">
+          <g class="grue-balance" transform="translate(494,120)">
+            <path class="trait fin" d="M0 0v10M-14 10h28"/>
+            <rect class="plein" x="-16" y="10" width="32" height="12" rx="2" opacity=".75"/>
+          </g>
+        </g>
+      </g>
+
+      <!-- Poussiere -->
+      <g opacity=".7">
+        <circle class="plein poussiere" cx="120" cy="320" r="2" style="animation-delay:0s"/>
+        <circle class="plein poussiere" cx="330" cy="326" r="1.6" style="animation-delay:2.5s"/>
+        <circle class="plein poussiere" cx="440" cy="322" r="2.2" style="animation-delay:5s"/>
+        <circle class="plein poussiere" cx="240" cy="328" r="1.4" style="animation-delay:7.5s"/>
+      </g>
+    </svg>
 
     <div class="auth-stats">
       <div class="stat"><b>14</b><span>Niveaux</span></div>
