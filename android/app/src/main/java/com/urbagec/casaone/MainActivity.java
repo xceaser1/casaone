@@ -20,6 +20,9 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
@@ -346,6 +349,41 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public int versionApp() {
             return BuildConfig.VERSION_CODE;
+        }
+
+        /**
+         * Miroir natif de la file de pointages (voir FileNative).
+         *
+         * La page appelle ces trois methodes quand elle empile ou vide sa
+         * propre file. Elles ne peuvent qu'ajouter du travail au natif, jamais
+         * en retirer a la page : si l'une d'elles echoue, la page garde sa
+         * copie et rien n'est perdu.
+         */
+        @JavascriptInterface
+        public void enfiler(String json) {
+            if (!origineSure()) return;
+            try {
+                FileNative.enfiler(getApplicationContext(), new JSONObject(json));
+            } catch (Throwable ignore) { }
+        }
+
+        @JavascriptInterface
+        public void retirer(String jsonUuids) {
+            if (!origineSure()) return;
+            try {
+                FileNative.retirer(getApplicationContext(), new JSONArray(jsonUuids));
+            } catch (Throwable ignore) { }
+        }
+
+        /** Nombre de pointages que le natif tient encore, pour diagnostic. */
+        @JavascriptInterface
+        public int enAttente() {
+            if (!origineSure()) return 0;
+            try {
+                return FileNative.compter(getApplicationContext());
+            } catch (Throwable t) {
+                return 0;
+            }
         }
 
         /** Feuille de partage Android (export, lien de badge...). */

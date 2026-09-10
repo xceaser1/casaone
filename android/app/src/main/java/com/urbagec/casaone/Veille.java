@@ -17,6 +17,7 @@ import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.concurrent.TimeUnit;
@@ -67,6 +68,12 @@ public class Veille extends Worker {
     @NonNull
     @Override
     public Result doWork() {
+        // Le vidage passe AVANT l'etat : c'est la seule chose qui puisse
+        // perdre des donnees. Il ne depend pas non plus de la reussite de
+        // /api/mobile/etat — l'utilisateur peut avoir des pointages en
+        // attente sans droit sur le tableau de bord.
+        vider(getApplicationContext());
+
         JSONObject etat = Reseau.json(getApplicationContext(), "/api/mobile/etat");
         if (etat == null || !etat.optBoolean("ok", false)) {
             // Hors ligne ou session expiree : on reessaiera au prochain tour.
@@ -76,6 +83,46 @@ public class Veille extends Worker {
         WidgetChantier.rafraichir(getApplicationContext(), etat);
         signaler(etat);
         return Result.success();
+    }
+
+    /**
+     * Envoie les pointages restes en attente, application fermee.
+     *
+     * C'est la raison d'etre de la file native : la page web ne peut pas le
+     * faire, Background Sync n'existant pas dans une WebView.
+     *
+     * REGLE DE RETRAIT, identique a celle de la page : on ne retire une ligne
+     * que si le serveur l'a acceptee (`ok`) ou refusee DEFINITIVEMENT (badge
+     * inconnu). Un echec reseau, une session expiree ou une erreur serveur
+     * laissent la file intacte — sans quoi un pointage disparaitrait sans
+     * jamais avoir ete enregistre.
+     */
+    static void vider(Context c) {
+        try {
+            JSONArray lignes = FileNative.tous(c);
+            if (lignes.length() == 0) return;
+
+            JSONObject corps = new JSONObject();
+            corps.put("pointages", lignes);
+            JSONObject reponse = Reseau.postJson(c, "/api/checkin/lot", corps);
+            if (reponse == null) return;          // on garde tout et on reessaiera
+
+            JSONArray resultats = reponse.optJSONArray("resultats");
+            if (resultats == null) return;
+
+            JSONArray aRetirer = new JSONArray();
+            for (int i = 0; i < resultats.length(); i++) {
+                JSONObject r = resultats.optJSONObject(i);
+                if (r == null) continue;
+                if (r.optBoolean("ok", false) || r.optBoolean("definitif", false)) {
+                    aRetirer.put(r.optString("uuid"));
+                }
+            }
+            FileNative.retirer(c, aRetirer);
+        } catch (Throwable ignore) {
+            // Une file qu'on n'arrive pas a vider reste en place : le pire cas
+            // est un envoi differe, jamais une perte.
+        }
     }
 
     /**
